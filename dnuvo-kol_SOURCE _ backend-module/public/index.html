@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>d.nuvo Pipeline · Creators → Content → Post → KPI</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1A1714;--sl:#5A4E3C;--ms:#9A8E7A;
+  --cr:#F0EDE8;--c1:#EDE8DF;--c2:#DDD6C8;--bd:#D8D0C0;--bd2:#C8BEA8;
+  --gd:#B89000;--gl:#D4A800;--gdbg:#FBF5D0;
+  --sg:#266040;--sgbg:#E0F0E8;--rs:#B03828;--rsbg:#FAEAE6;
+  --sk:#1A4888;--skbg:#E4EEF8;--tl:#186868;--tlbg:#DCF0F0;--pp:#502898;--ppbg:#EEE8F8;
+  --sh:0 1px 4px rgba(26,23,20,.07),0 4px 18px rgba(26,23,20,.09);
+}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--c1)}::-webkit-scrollbar-thumb{background:var(--c2);border-radius:2px}
+body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-height:100vh;font-size:13px}
+
+.topbar{background:#0F0C08;padding:0 26px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.tb-l{display:flex;align-items:center;gap:10px}
+.gem{width:24px;height:24px;background:linear-gradient(135deg,#B89000,#266040);clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%)}
+.tb-name{font-family:"Playfair Display",serif;font-size:15px;font-weight:700;color:#F5F0E0}
+.tb-name em{color:#D4A800;font-style:italic}
+.tb-sub{font-size:8.5px;text-transform:uppercase;letter-spacing:.18em;color:rgba(245,240,224,.28)}
+.tb-pill{padding:3px 10px;border-radius:20px;font-size:9.5px;font-weight:600;border:1px solid rgba(255,255,255,.1);color:rgba(245,240,224,.45)}
+
+/* PIPELINE RAIL — signature */
+.rail{background:#fff;border-bottom:2px solid var(--bd2);padding:14px 26px 12px;position:sticky;top:56px;z-index:99}
+.rail-track{max-width:1200px;margin:0 auto;display:flex;align-items:center}
+.rnode{display:flex;flex-direction:column;align-items:center;cursor:pointer;background:none;border:none;font-family:"Inter",sans-serif;min-width:88px}
+.rdot{width:30px;height:30px;border-radius:50%;border:2px solid var(--bd2);background:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ms);transition:all .25s;margin-bottom:5px}
+.rnode.done .rdot{background:var(--sg);border-color:var(--sg);color:#fff}
+.rnode.on .rdot{background:linear-gradient(135deg,#B89000,#D4A800);border-color:var(--gd);color:#1A1714;box-shadow:0 0 0 4px rgba(184,144,0,.15)}
+.rlabel{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ms)}
+.rnode.on .rlabel{color:var(--gd)}.rnode.done .rlabel{color:var(--sg)}
+.rline{flex:1;height:2px;background:var(--c2);margin:0 4px 18px;position:relative;overflow:hidden}
+.rline.done::after{content:"";position:absolute;inset:0;background:var(--sg)}
+.rlock{font-size:8px;color:var(--rs);margin-top:2px}
+
+.pg{display:none;padding:24px 26px;max-width:1240px;margin:0 auto}
+.pg.on{display:block}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.mb{margin-bottom:13px}.mb2{margin-bottom:20px}.mt{margin-top:10px}
+
+.card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:16px;box-shadow:var(--sh)}
+.card-hd{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--sl);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.stitle{font-family:"Playfair Display",serif;font-size:16px;font-weight:700;margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.stitle::after{content:"";flex:1;height:1px;background:var(--bd2)}
+
+.fld{margin-bottom:12px}
+.fld label{display:block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--sl);margin-bottom:4px}
+.fld input,.fld textarea,.fld select{width:100%;padding:9px 12px;border:1px solid var(--bd2);border-radius:7px;font-family:"Inter",sans-serif;font-size:12.5px;color:var(--ink);background:#fff;outline:none;transition:border-color .15s}
+.fld input:focus,.fld textarea:focus,.fld select:focus{border-color:var(--gd);box-shadow:0 0 0 3px rgba(184,144,0,.08)}
+.fld textarea{min-height:64px;resize:vertical;line-height:1.7}
+.req::after{content:" *";color:var(--rs)}
+
+.btn{padding:10px 20px;border-radius:7px;font-family:"Inter",sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .18s}
+.btn-gold{background:linear-gradient(135deg,#B89000,#D4A800);color:#1A1714}
+.btn-gold:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(184,144,0,.35)}
+.btn-gold:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-outline{background:transparent;border:1px solid var(--bd2);color:var(--sl)}
+.btn-outline:hover{border-color:var(--gd);color:var(--gd)}
+.btn-sm{padding:5px 12px;font-size:10.5px}
+
+.ib{padding:10px 13px;border-radius:7px;margin-bottom:8px}
+.ib:last-child{margin-bottom:0}
+.ibg{background:var(--gdbg);border-left:3px solid var(--gd)}
+.ibs{background:var(--sgbg);border-left:3px solid var(--sg)}
+.ibr{background:var(--rsbg);border-left:3px solid var(--rs)}
+.ibsk{background:var(--skbg);border-left:3px solid var(--sk)}
+.ibt{background:var(--tlbg);border-left:3px solid var(--tl)}
+.ibl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.ibb{font-size:12px;line-height:1.75;color:#2E2416}
+
+.dt{width:100%;border-collapse:collapse}
+.dt th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--sl);padding:8px 10px;border-bottom:1px solid var(--bd2);background:var(--c1);text-align:left}
+.dt td{padding:8px 10px;border-bottom:1px solid var(--bd);font-size:11.5px;color:var(--sl);vertical-align:top}
+.dt tr:last-child td{border-bottom:none}
+.dt td:first-child{font-weight:600;color:var(--ink)}
+
+.tag{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700}
+.tS{background:var(--sgbg);color:var(--sg)}.tR{background:var(--rsbg);color:var(--rs)}
+.tG{background:var(--gdbg);color:#8A7000}.tB{background:var(--skbg);color:var(--sk)}.tT{background:var(--tlbg);color:var(--tl)}
+
+.spinner{width:26px;height:26px;border:3px solid var(--c2);border-top-color:var(--gd);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading{text-align:center;padding:28px;color:var(--ms);font-size:11.5px}
+
+.empty{border:2px dashed var(--bd2);border-radius:10px;padding:32px;text-align:center;color:var(--ms)}
+.empty h4{font-family:"Playfair Display",serif;font-size:14px;color:var(--sl);margin-bottom:5px}
+.empty p{font-size:11.5px;line-height:1.7}
+
+.kpi{background:#fff;border:1px solid var(--bd);border-radius:9px;padding:13px 15px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.kpi::after{content:"";position:absolute;bottom:0;left:0;right:0;height:3px}
+.kS::after{background:var(--sg)}.kG::after{background:var(--gd)}.kR::after{background:var(--rs)}.kB::after{background:var(--sk)}.kT::after{background:var(--tl)}
+.klbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--sl);margin-bottom:4px}
+.kval{font-family:"Playfair Display",serif;font-size:24px;font-weight:700;line-height:1}
+.vS{color:var(--sg)}.vG{color:var(--gd)}.vR{color:var(--rs)}.vB{color:var(--sk)}.vT{color:var(--tl)}
+.knote{font-size:10px;color:var(--ms);margin-top:3px}
+
+.tier-row{display:grid;grid-template-columns:110px 1fr 90px 120px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd)}
+.tier-row:last-child{border-bottom:none}
+.tier-name{font-size:11.5px;font-weight:700}
+.tier-range{font-size:10px;color:var(--ms)}
+.tier-row input{padding:6px 9px;border:1px solid var(--bd2);border-radius:6px;font-size:12px;width:100%;text-align:center}
+
+.chk-line{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--sl)}
+.chk-line input[type=checkbox]{width:15px;height:15px;accent-color:var(--gd)}
+
+.verify-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:8.5px;font-weight:700;background:var(--gdbg);color:#8A7000;border:1px dashed rgba(184,144,0,.4)}
+
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-cell{border:1px solid var(--bd);border-radius:6px;min-height:64px;padding:4px 5px;background:#fff;font-size:9px}
+.cal-day{font-weight:700;color:var(--ms);margin-bottom:2px}
+.cal-post{padding:2px 4px;border-radius:4px;margin-bottom:2px;font-size:8px;font-weight:600;line-height:1.3;cursor:default}
+.cp-tt{background:#1A1410;color:#F5F0E0}.cp-ig{background:linear-gradient(135deg,#833ab4,#fd1d1d);color:#fff}
+.cp-fb{background:#1877F2;color:#fff}.cp-sp{background:#F05A28;color:#fff}.cp-lz{background:#0F146B;color:#fff}.cp-sf{background:#95BF47;color:#1A1714}
+.cal-special{background:var(--gdbg);border-color:var(--gd)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-l">
+    <div class="gem"></div>
+    <div>
+      <div class="tb-name"><em>d.nuvo Pipeline</em> — Creators → Content → Post → KPI</div>
+      <div class="tb-sub">AkaDigital · Real data only · No mockups</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:6px">
+    <div class="tb-pill" style="border-color:rgba(184,144,0,.4);color:#D4A800">AI Live</div>
+    <div class="tb-pill" id="api-pill">Backend: checking...</div>
+    <button class="tb-pill" style="cursor:pointer;background:none" onclick="exportConfig()">⬇ Export setup</button>
+  </div>
+</div>
+
+<!-- PIPELINE RAIL -->
+<div class="rail">
+  <div class="rail-track">
+    <button class="rnode on" id="rn-0" onclick="goStep(0)"><div class="rdot">⚙</div><div class="rlabel">Setup</div></button>
+    <div class="rline" id="rl-0"></div>
+    <button class="rnode" id="rn-1" onclick="goStep(1)"><div class="rdot">1</div><div class="rlabel">Creators</div><div class="rlock" id="lk-1">🔒 setup first</div></button>
+    <div class="rline" id="rl-1"></div>
+    <button class="rnode" id="rn-2" onclick="goStep(2)"><div class="rdot">2</div><div class="rlabel">Content</div><div class="rlock" id="lk-2">🔒</div></button>
+    <div class="rline" id="rl-2"></div>
+    <button class="rnode" id="rn-3" onclick="goStep(3)"><div class="rdot">3</div><div class="rlabel">Recommend</div><div class="rlock" id="lk-3">🔒</div></button>
+    <div class="rline" id="rl-3"></div>
+    <button class="rnode" id="rn-4" onclick="goStep(4)"><div class="rdot">$</div><div class="rlabel">Budget · KPI</div><div class="rlock" id="lk-4">🔒</div></button>
+  </div>
+</div>
+
+<!-- ════════ STEP 0: SETUP ════════ -->
+<div class="pg on" id="pg-0">
+  <div class="stitle">Campaign Setup — Answer Before Anything Generates</div>
+  <div class="card mb2">
+    <div class="card-hd">Flow Guide · Navigate In Order</div>
+    <div class="ibb" style="line-height:1.8">
+      1. Setup: Complete required fields, then click Save Setup & Unlock Pipeline.<br>
+      2. Creators: Run Source Creators Now, review shortlist and rejection debug, verify profile links.<br>
+      3. Content: Generate scripts and edit briefs, then build schedule and send to live queue.<br>
+      4. Recommend: Generate channel, ads, pricing, and CRM modules from setup data.<br>
+      5. Budget & KPI: Allocate budget, save KPI entries, and review KPI history + audit trail.<br>
+      6. Persistence: Save Campaign Snapshot regularly and reload from Campaign Workspace.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap" class="mt">
+      <button class="btn btn-outline" onclick="runConnectionCheck()">Run Connection Check</button>
+    </div>
+    <div id="connection-msg" class="mt"></div>
+  </div>
+  <div class="card mb2">
+    <div class="card-hd">Campaign Workspace (Persistent)</div>
+    <div class="g2" style="gap:10px">
+      <div class="fld" style="margin:0"><label for="campaign-name">Campaign name</label><input id="campaign-name" placeholder="e.g. DNUVO SG Q4 Launch" title="Campaign name"></div>
+      <div class="fld" style="margin:0"><label for="campaign-select">Load existing campaign</label><select id="campaign-select" title="Load existing campaign"><option value="">Select campaign...</option></select></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold" onclick="saveCampaignSnapshot()">Save Campaign Snapshot</button>
+      <button class="btn btn-outline" onclick="loadCampaignList()">Refresh Campaign List</button>
+      <button class="btn btn-outline" onclick="loadSelectedCampaign()">Load Selected Campaign</button>
+    </div>
+    <div id="campaign-msg" class="mt"></div>
+  </div>
+  <div class="ib ibg mb2"><div class="ibl" style="color:#8A7000">Why this gate exists</div><div class="ibb">Every output downstream — creator shortlists, content briefs, schedules, budget splits — is generated from these answers only. Nothing is pre-filled, nothing is mocked. Fields marked * are required to unlock Step 1.</div></div>
+
+  <div class="g2 mb2">
+    <div class="card">
+      <div class="card-hd">Brand & Market</div>
+      <div class="fld"><label class="req">Budget range (SGD, total campaign)</label><input id="s-budget" type="number" placeholder="e.g. 15000"></div>
+      <div class="fld"><label class="req">Brand URL</label><input id="s-brand-url" placeholder="dnuvo.com.sg"></div>
+      <div class="fld"><label class="req">Location focus</label><input id="s-location" placeholder="Singapore" value=""></div>
+      <div class="fld"><label>Minimum local audience % per creator</label><input id="s-local-floor" type="number" value="70" min="50" max="100" title="Minimum local audience percent"></div>
+      <div class="fld"><label class="req">Campaign period (start → end)</label>
+        <div style="display:flex;gap:8px"><input id="s-date-start" type="date" style="flex:1" title="Campaign start date"><input id="s-date-end" type="date" style="flex:1" title="Campaign end date"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Competitors, Handles & SKUs</div>
+      <div class="fld"><label class="req">Competitor info URL(s) — one per line</label><textarea id="s-competitors" placeholder="shopee.sg/cosrx.official&#10;beautyofjoseon.com"></textarea></div>
+      <div class="fld"><label class="req">Your social handles — one per line</label><textarea id="s-handles" placeholder="tiktok.com/@d.nuvo_official&#10;instagram.com/d.nuvo"></textarea></div>
+      <div class="fld"><label class="req">Hero SKUs or bundles — name + price, one per line</label><textarea id="s-skus" placeholder="Vitamin C Ampoule 15.5% — S$56 RRP / S$32 sale&#10;Calming Ampoule 30ml — S$64 / S$39"></textarea></div>
+      <div class="fld"><label>Platforms to activate</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px">
+          <label class="chk-line"><input type="checkbox" class="s-plat" value="TikTok" checked>TikTok</label>
+          <label class="chk-line"><input type="checkbox" class="s-plat" value="Instagram" checked>Instagram</label>
+          <label class="chk-line"><input type="checkbox" class="s-plat" value="Facebook">Facebook</label>
+          <label class="chk-line"><input type="checkbox" class="s-plat" value="Shopee" checked>Shopee</label>
+          <label class="chk-line"><input type="checkbox" class="s-plat" value="Lazada">Lazada</label>
+          <label class="chk-line"><input type="checkbox" class="s-plat" value="Shopify" checked>Shopify</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">Promotional Periods In Range</div>
+    <div style="font-size:11.5px;color:var(--sl);margin-bottom:8px">Tick the sale events falling inside your campaign window. The scheduler weights content and budget toward these automatically.</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px">
+      <label class="chk-line"><input type="checkbox" class="s-period" value="9.9 Mega Sale">9.9 Mega Sale</label>
+      <label class="chk-line"><input type="checkbox" class="s-period" value="10.10 Sale">10.10</label>
+      <label class="chk-line"><input type="checkbox" class="s-period" value="11.11 Mega Sale">11.11 Mega Sale</label>
+      <label class="chk-line"><input type="checkbox" class="s-period" value="12.12 Sale">12.12</label>
+      <label class="chk-line"><input type="checkbox" class="s-period" value="Payday (25th–1st)">Payday window</label>
+      <label class="chk-line"><input type="checkbox" class="s-period" value="Flash sale (custom)">Custom flash sale</label>
+      <label class="chk-line"><input type="checkbox" class="s-period" value="BAU" checked>BAU (always-on)</label>
+      <label class="chk-line"><input type="checkbox" class="s-period" value="CNY / Raya gifting">CNY / Raya</label>
+    </div>
+  </div>
+
+  <button class="btn btn-gold" style="width:100%" onclick="saveSetup()">Save Setup & Unlock Pipeline →</button>
+  <div id="setup-msg" class="mt"></div>
+</div>
+
+<!-- ════════ STEP 1: CREATORS ════════ -->
+<div class="pg" id="pg-1">
+  <div class="stitle">Section 1 — Creator Sourcing (AI + Verification Queue)</div>
+
+  <div class="g2 mb2">
+    <div class="card">
+      <div class="card-hd">How many creators per tier?</div>
+      <div class="tier-row"><div class="tier-name">Nano</div><div class="tier-range">1K–25K followers · product gifting + commission</div><input id="t-nano" type="number" value="0" min="0"><div style="font-size:10px;color:var(--ms)">S$0–300 each</div></div>
+      <div class="tier-row"><div class="tier-name">Micro</div><div class="tier-range">25K–100K · paid UGC sweet spot</div><input id="t-micro" type="number" value="0" min="0"><div style="font-size:10px;color:var(--ms)">S$300–1.2K</div></div>
+      <div class="tier-row"><div class="tier-name">Mid</div><div class="tier-range">100K–500K · reach + conversion</div><input id="t-mid" type="number" value="0" min="0"><div style="font-size:10px;color:var(--ms)">S$1.2K–5K</div></div>
+      <div class="tier-row"><div class="tier-name">Macro</div><div class="tier-range">500K–1M · campaign anchors</div><input id="t-macro" type="number" value="0" min="0"><div style="font-size:10px;color:var(--ms)">S$5K–15K</div></div>
+      <div class="tier-row"><div class="tier-name">Mega</div><div class="tier-range">1M+ · launch moments only</div><input id="t-mega" type="number" value="0" min="0"><div style="font-size:10px;color:var(--ms)">S$15K+</div></div>
+      <div class="fld mt"><label>Backup list size (auto-generated alternates)</label><input id="t-backup" type="number" value="5" min="0"></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Partnership Types & Fit Rules</div>
+      <label class="chk-line"><input type="checkbox" id="p-paid" checked>Paid UGC partnerships</label>
+      <label class="chk-line"><input type="checkbox" id="p-gift" checked>Product gifting (nano/micro)</label>
+      <label class="chk-line"><input type="checkbox" id="p-live">Livestream co-hosts (Shopee LIVE / TikTok LIVE — requires LIVE commerce history)</label>
+      <label class="chk-line"><input type="checkbox" id="p-affiliate" checked>Affiliate commission codes (25% d.nuvo standard)</label>
+      <div class="ib ibs mt"><div class="ibl" style="color:var(--sg)">Hard rules applied to every candidate</div><div class="ibb">• Local audience ≥ <strong id="floor-echo">70</strong>% (from Setup) — instant exclude below<br>• Active in last 90 days — dormant accounts excluded<br>• ER ≥ 3% TikTok / ≥ 2% IG vs tier benchmark<br>• Profile must fit d.nuvo positioning (clinical ceramide skincare, sensitive skin, K-beauty)<br>• Cost included where publicly known; otherwise marked "rate on request"</div></div>
+      <div class="ib ibg mt"><div class="ibl" style="color:#8A7000">Verification honesty rule</div><div class="ibb">The AI proposes candidates from search knowledge. It cannot click links. Every candidate carries a <span class="verify-badge">⏳ pending link check</span> badge until the backend module's <code style="font-family:'JetBrains Mono',monospace;font-size:10px">/verify-creator</code> endpoint confirms the profile URL is live and active. No candidate is ever labelled "verified" without that check.</div></div>
+    </div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">Creator Link Verification Queue (backend)</div>
+    <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:8px">Paste one creator profile URL per line (TikTok or Instagram). This runs the server-side verifier so you can separate live profiles from dead or blocked links before contract outreach.</div>
+    <div class="fld"><label>Profile URLs to verify</label><textarea id="v-urls" placeholder="https://www.tiktok.com/@creatorhandle&#10;https://www.instagram.com/creatorhandle" style="min-height:88px"></textarea></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold" onclick="verifyCreatorLinks()">Verify Links Now →</button>
+      <button class="btn btn-outline" onclick="document.getElementById('v-urls').value=''">Clear</button>
+    </div>
+    <div id="verify-output" class="mt"></div>
+  </div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap" class="mb">
+    <button class="btn btn-gold" id="btn-source" onclick="sourceCreators()">Source Creators Now →</button>
+    <button class="btn btn-outline" onclick="exportSourcingAllCSV()">⬇ Export All (incl rejected)</button>
+  </div>
+  <div id="creators-output" class="mt"></div>
+</div>
+
+<!-- ════════ STEP 2: CONTENT ════════ -->
+<div class="pg" id="pg-2">
+  <div class="stitle">Section 2 — Content Production & Media Schedule</div>
+
+  <div class="g2 mb2">
+    <div class="card">
+      <div class="card-hd">A · AI UGC Content Builder</div>
+      <div class="fld"><label>SKU to feature (from Setup)</label><select id="c-sku"></select></div>
+      <div class="fld"><label>Content format</label>
+        <select id="c-format">
+          <option>15–30s TikTok UGC — before/after</option>
+          <option>30–60s TikTok — ingredient explainer</option>
+          <option>30-day diary series (3 videos)</option>
+          <option>IG Reel — AM/PM routine</option>
+          <option>LIVE session run-of-show (90 min)</option>
+          <option>Shopee listing video (30s)</option>
+        </select>
+      </div>
+      <div class="fld"><label>Hook angle</label>
+        <select id="c-hook">
+          <option>Skin concern reveal ("Do you have milia?")</option>
+          <option>Before state → transformation</option>
+          <option>Ingredient science ("Why ceramides work in SG humidity")</option>
+          <option>Price comparison vs competitor</option>
+          <option>Routine simplification ("2 steps only")</option>
+        </select>
+      </div>
+      <div class="fld"><label>Number of scripts to generate</label><input id="c-count" type="number" value="3" min="1" max="10"></div>
+      <button class="btn btn-gold" style="width:100%" onclick="buildContent()">Generate Scripts + Shot Lists →</button>
+    </div>
+    <div class="card">
+      <div class="card-hd">B · Edit Brief From Your Uploaded Footage</div>
+      <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:8px">Describe footage you already have (livestream recordings, raw creator clips, product shots). The AI writes a cut-by-cut edit brief for each output clip — compatible with your DNUVO cutter tool or any editor.</div>
+      <div class="fld"><label>Describe available footage</label><textarea id="c-footage" placeholder="e.g. 90-min Shopee LIVE recording from 12 Jun — host demos Vit C Ampoule at 00:14, applies Calming Ampoule 00:31, Q&A on milia 00:47..." style="min-height:96px"></textarea></div>
+      <div class="fld"><label>Clips wanted from this footage</label><input id="c-clips" type="number" value="4" min="1" max="12"></div>
+      <button class="btn btn-gold" style="width:100%" onclick="buildEditBrief()">Generate Edit Brief →</button>
+    </div>
+  </div>
+
+  <div id="content-output" class="mb2"></div>
+
+  <div class="stitle">Media Schedule — Auto-Built From Your Campaign Window</div>
+  <div class="card mb2">
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+      <div class="fld" style="flex:1;min-width:160px;margin:0"><label>Posts per week per platform</label><input id="sch-freq" type="number" value="3" min="1" max="14"></div>
+      <div class="fld" style="flex:1;min-width:160px;margin:0"><label>Best-time preset</label>
+        <select id="sch-times"><option value="sg">SG peak (12pm · 6pm · 9pm)</option><option value="test">A/B rotate slots</option></select>
+      </div>
+      <button class="btn btn-gold" onclick="buildSchedule()">Build Schedule →</button>
+      <button class="btn btn-outline" onclick="queueSchedule()">Send To Live Queue</button>
+      <button class="btn btn-outline" onclick="processQueueNow()">Run Due Posts Now</button>
+      <button class="btn btn-outline" onclick="refreshQueueStatus()">Refresh Queue Status</button>
+      <button class="btn btn-outline" onclick="exportScheduleCSV()">⬇ Export CSV</button>
+    </div>
+    <div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Posting execution</div><div class="ibb">This dashboard builds and exports the schedule. Actual auto-posting to TikTok and Meta runs through the included backend module (<code style="font-family:'JetBrains Mono',monospace;font-size:10px">scheduler.js</code> + platform APIs) once your developer-app credentials are approved — see the API Application Guide. Until then, the CSV imports directly into Meta Business Suite Planner and TikTok's native scheduler.</div></div>
+    <div id="schedule-output" class="mt"></div>
+    <div id="queue-output" class="mt"></div>
+  </div>
+</div>
+
+<!-- ════════ STEP 3: RECOMMEND ════════ -->
+<div class="pg" id="pg-3">
+  <div class="stitle">Section 3 — Strategy Recommendations (Generated From Your Setup)</div>
+  <div class="g2 mb2">
+    <div class="card">
+      <div class="card-hd">Generate</div>
+      <label class="chk-line"><input type="checkbox" class="rec-mod" value="channel" checked>Channel strategy — Shopee · TikTok Shop · Lazada · Shopify</label>
+      <label class="chk-line"><input type="checkbox" class="rec-mod" value="ads" checked>Ads plan — Spark, Shopee Ads, Meta</label>
+      <label class="chk-line"><input type="checkbox" class="rec-mod" value="pricing" checked>Pricing strategy vs competitors (uses your competitor URLs)</label>
+      <label class="chk-line"><input type="checkbox" class="rec-mod" value="crm" checked>CRM — lead capture, nurture flows, retention</label>
+      <button class="btn btn-gold mt" style="width:100%" onclick="buildRecommendations()">Generate Recommendations →</button>
+    </div>
+    <div class="card">
+      <div class="card-hd">What feeds these recommendations</div>
+      <div id="rec-inputs-echo" style="font-size:11.5px;color:var(--sl);line-height:1.9">Complete Setup to see your inputs here.</div>
+    </div>
+  </div>
+  <div id="rec-output"></div>
+</div>
+
+<!-- ════════ STEP 4: BUDGET & KPI ════════ -->
+<div class="pg" id="pg-4">
+  <div class="stitle">Budget Allocation & KPI Tracking</div>
+  <div class="g2 mb2">
+    <div class="card">
+      <div class="card-hd">Budget Split</div>
+      <div id="budget-view" class="empty"><h4>No budget allocated yet</h4><p>Complete Setup and Section 1 (creator counts), then generate the split below.</p></div>
+      <button class="btn btn-gold mt" style="width:100%" onclick="buildBudget()">Allocate Budget →</button>
+    </div>
+    <div class="card">
+      <div class="card-hd">KPI Entry — Actuals Only</div>
+      <div style="font-size:11px;color:var(--sl);margin-bottom:8px">Enter real results as they land. Nothing here is estimated or pre-filled — metrics compute only from what you enter.</div>
+      <div class="g2" style="gap:8px">
+        <div class="fld"><label>Ad spend to date (S$)</label><input id="k-spend" type="number" placeholder="0"></div>
+        <div class="fld"><label>Attributed revenue (S$)</label><input id="k-rev" type="number" placeholder="0"></div>
+        <div class="fld"><label>Orders</label><input id="k-orders" type="number" placeholder="0"></div>
+        <div class="fld"><label>Leads / email captures</label><input id="k-leads" type="number" placeholder="0"></div>
+        <div class="fld"><label>Video views (all platforms)</label><input id="k-views" type="number" placeholder="0"></div>
+        <div class="fld"><label>Link clicks</label><input id="k-clicks" type="number" placeholder="0"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-gold" onclick="calcKPI()">Compute KPIs →</button>
+        <button class="btn btn-outline" onclick="saveKpiEntry()">Save KPI Entry</button>
+        <button class="btn btn-outline" onclick="loadKpiHistory()">Load KPI History</button>
+      </div>
+      <div id="kpi-msg" class="mt"></div>
+    </div>
+  </div>
+  <div id="kpi-output" class="g4"></div>
+  <div id="kpi-history" class="mt"></div>
+  <div id="audit-output" class="mt"></div>
+  <div class="mt card">
+    <div class="card-hd">KPI Targets (d.nuvo M1–M3 framework)</div>
+    <table class="dt">
+      <thead><tr><th>Metric</th><th>M1 target</th><th>M2 target</th><th>M3 target</th></tr></thead>
+      <tbody>
+        <tr><td>ROAS (paid channels)</td><td>n/a — no paid ads until 15 reviews</td><td>≥ 1.5×</td><td>≥ 3.5×</td></tr>
+        <tr><td>Shopee reviews</td><td>15 (gate)</td><td>50</td><td>200</td></tr>
+        <tr><td>CPL (email capture)</td><td>≤ S$3</td><td>≤ S$2.50</td><td>≤ S$2</td></tr>
+        <tr><td>Creator content live</td><td>13+ pieces</td><td>+8</td><td>+10</td></tr>
+        <tr><td>Revenue</td><td>S$5K</td><td>S$11K</td><td>S$23K</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ═══ STATE (in-memory only — export/import via JSON file) ═══
+const S = { campaignId:null, campaignName:'', setup:null, creators:null, content:[], schedule:[], budget:null, verifications:[], kpiLatest:null, kpiHistory:[], sourcingData:null };
+
+async function api(path, opts={}){
+  const r = await fetch(path, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
+  return data;
+}
+
+async function checkBackend(){
+  const pill = document.getElementById('api-pill');
+  try{
+    await api('/schedule/summary');
+    pill.textContent = 'Backend: online';
+    pill.style.borderColor = 'rgba(38,96,64,.55)';
+    pill.style.color = '#9EE0BD';
+  }catch(_){
+    pill.textContent = 'Backend: offline';
+    pill.style.borderColor = 'rgba(176,56,40,.5)';
+    pill.style.color = '#F7B6AA';
+  }
+}
+
+async function runConnectionCheck(){
+  const msg = document.getElementById('connection-msg');
+  msg.innerHTML = `<div class="loading"><div class="spinner"></div><p>Checking backend and service connections...</p></div>`;
+  try{
+    const h = await api('/health');
+    const s = h.services || {};
+    const rows = [
+      ['Backend API', s.backend],
+      ['Database', s.database],
+      ['Anthropic configured', s.anthropicConfigured],
+      ['Apify configured', s.apifyConfigured],
+      ['TikTok configured', s.tiktokConfigured],
+      ['Meta configured', s.metaConfigured],
+    ].map(([k,v]) => `<tr><td>${k}</td><td>${v ? '<span class="tag tS">OK</span>' : '<span class="tag tR">Missing</span>'}</td></tr>`).join('');
+    msg.innerHTML = `<table class="dt"><thead><tr><th>Connection</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Connection check failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+// ═══ CLAUDE API ═══
+async function ai(prompt){
+  const d = await api('/ai/generate', { method:'POST', body:{ prompt, system:SYS, maxTokens:1000 } });
+  return d.text || '';
+}
+const SYS = `You are AkaDigital's pipeline engine for d.nuvo (Korean ceramide clinical skincare, Singapore-only M1–M3).
+HARD RULES:
+- Local audience >= the user's floor (default 70%) for every creator suggested. Exclude and say so otherwise.
+- Never fabricate follower counts, ER, or costs as verified. Label every number "est." with a source hint (Modash/Favikon/public profile) and mark each candidate PENDING LINK CHECK — the backend /verify-creator endpoint must confirm the URL is live before outreach.
+- Only suggest creators plausibly active in the last 90 days. If unsure, say "activity unverified".
+- Costs: give SGD ranges from tier benchmarks; write "rate on request" when unknown.
+- d.nuvo non-negotiables: 25% commission linkage, 15 Shopee reviews before paid ads/LIVE, Spark Ad rights on TikTok posts.
+- Verdict before evidence. No em-dashes. SGD. Concise.`;
+
+// ═══ RAIL / NAV ═══
+let unlocked = [true,false,false,false,false];
+function goStep(n){
+  if(!unlocked[n]){ alert('Complete Setup first to unlock this step.'); return; }
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pg-'+n).classList.add('on');
+  for(let i=0;i<5;i++){
+    const node=document.getElementById('rn-'+i);
+    node.classList.toggle('on',i===n);
+  }
+}
+function unlockAll(){
+  unlocked=[true,true,true,true,true];
+  for(let i=1;i<5;i++){ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=''; }
+  document.getElementById('rn-0').classList.add('done');
+  document.getElementById('rl-0').classList.add('done');
+}
+
+function applySetupToUI(){
+  if(!S.setup) return;
+  const s = S.setup;
+  document.getElementById('s-budget').value = s.budget || '';
+  document.getElementById('s-brand-url').value = s.brand || '';
+  document.getElementById('s-location').value = s.loc || '';
+  document.getElementById('s-local-floor').value = s.floor || 70;
+  document.getElementById('s-date-start').value = s.dateStart || '';
+  document.getElementById('s-date-end').value = s.dateEnd || '';
+  document.getElementById('s-competitors').value = (s.comp || []).join('\n');
+  document.getElementById('s-handles').value = (s.handles || []).join('\n');
+  document.getElementById('s-skus').value = (s.skus || []).join('\n');
+  document.querySelectorAll('.s-plat').forEach(c => { c.checked = (s.platforms || []).includes(c.value); });
+  document.querySelectorAll('.s-period').forEach(c => { c.checked = (s.periods || []).includes(c.value); });
+  document.getElementById('floor-echo').textContent = s.floor || 70;
+  const sel=document.getElementById('c-sku');
+  sel.innerHTML=(s.skus || []).map(v=>`<option>${v}</option>`).join('');
+  document.getElementById('rec-inputs-echo').innerHTML=
+    `<strong>Budget:</strong> S$${Number(s.budget||0).toLocaleString()}<br><strong>Market:</strong> ${s.loc || '-'} (creators ≥${s.floor || 70}% local)<br>`+
+    `<strong>Window:</strong> ${s.dateStart || '-'} → ${s.dateEnd || '-'}<br><strong>Platforms:</strong> ${(s.platforms||[]).join(', ')}<br>`+
+    `<strong>Periods:</strong> ${(s.periods||[]).join(', ')}<br><strong>SKUs:</strong> ${(s.skus||[]).length} loaded<br><strong>Competitors:</strong> ${(s.comp||[]).join(', ')}`;
+}
+
+function hydrateFromSnapshot(snapshot){
+  S.setup = snapshot.setup || null;
+  S.creators = snapshot.creators || null;
+  S.content = snapshot.content || [];
+  S.schedule = snapshot.schedule || [];
+  S.budget = snapshot.budget || null;
+  S.verifications = snapshot.verifications || [];
+  applySetupToUI();
+  if (S.setup) unlockAll();
+  document.getElementById('creators-output').innerHTML = S.creators
+    ? `<div class="card"><div class="card-hd">Loaded Creator Candidates</div>${md(S.creators)}</div>`
+    : '';
+  document.getElementById('content-output').innerHTML = S.content.length
+    ? `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Loaded content assets</div><div class="ibb">${S.content.length} generated content block(s) restored from campaign snapshot.</div></div>`
+    : '';
+  document.getElementById('schedule-output').innerHTML = S.schedule.length
+    ? `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Loaded schedule</div><div class="ibb">${S.schedule.length} scheduled row(s) restored. You can queue them immediately.</div></div>`
+    : '';
+  document.getElementById('verify-output').innerHTML = S.verifications.length
+    ? `<div class="ib ibg"><div class="ibl" style="color:#8A7000">Loaded creator verifications</div><div class="ibb">${S.verifications.length} verification result(s) restored from campaign snapshot.</div></div>`
+    : '';
+}
+
+async function loadCampaignList(){
+  const sel = document.getElementById('campaign-select');
+  const msg = document.getElementById('campaign-msg');
+  try{
+    const data = await api('/campaigns');
+    const items = data.items || [];
+    sel.innerHTML = '<option value="">Select campaign...</option>' +
+      items.map(c => `<option value="${c.id}">#${c.id} · ${c.name} · ${new Date(c.updatedAt).toLocaleString()}</option>`).join('');
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Campaign list refreshed</div><div class="ibb">${items.length} campaign snapshot(s) available.</div></div>`;
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Unable to load campaigns</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function loadSelectedCampaign(){
+  const id = Number(document.getElementById('campaign-select').value || 0);
+  const msg = document.getElementById('campaign-msg');
+  if(!id){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">No campaign selected</div><div class="ibb">Choose a campaign first.</div></div>`;
+    return;
+  }
+  try{
+    const data = await api(`/campaigns/${id}`);
+    S.campaignId = data.id;
+    S.campaignName = data.name;
+    document.getElementById('campaign-name').value = data.name || '';
+    hydrateFromSnapshot(data.snapshot || {});
+    await loadKpiHistory();
+    await loadCampaignAudit();
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Campaign loaded</div><div class="ibb">Loaded #${data.id} ${data.name}. Last updated ${new Date(data.updatedAt).toLocaleString()}.</div></div>`;
+    goStep(0);
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Load failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function saveCampaignSnapshot(){
+  const msg = document.getElementById('campaign-msg');
+  if(!S.setup){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Setup required</div><div class="ibb">Save Setup first before persisting a campaign snapshot.</div></div>`;
+    return;
+  }
+  const name = document.getElementById('campaign-name').value.trim() || `d.nuvo campaign ${new Date().toISOString().slice(0,10)}`;
+  try{
+    const data = await api('/campaigns/save', {
+      method:'POST',
+      body:{
+        id: S.campaignId,
+        name,
+        status:'active',
+        snapshot:{
+          setup:S.setup,
+          creators:S.creators,
+          content:S.content,
+          budget:S.budget,
+          schedule:S.schedule,
+          verifications:S.verifications,
+        },
+      },
+    });
+    const campaign = data.campaign;
+    S.campaignId = campaign.id;
+    S.campaignName = campaign.name;
+    document.getElementById('campaign-name').value = campaign.name;
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Campaign snapshot saved</div><div class="ibb">Saved as #${campaign.id} ${campaign.name}. Updated ${new Date(campaign.updatedAt).toLocaleString()}.</div></div>`;
+    await loadCampaignList();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Save failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+// ═══ SETUP ═══
+function saveSetup(){
+  const budget=+document.getElementById('s-budget').value;
+  const brand=document.getElementById('s-brand-url').value.trim();
+  const loc=document.getElementById('s-location').value.trim();
+  const comp=document.getElementById('s-competitors').value.trim();
+  const handles=document.getElementById('s-handles').value.trim();
+  const skus=document.getElementById('s-skus').value.trim();
+  const ds=document.getElementById('s-date-start').value, de=document.getElementById('s-date-end').value;
+  const msg=document.getElementById('setup-msg');
+  const missing=[];
+  if(!budget)missing.push('budget'); if(!brand)missing.push('brand URL'); if(!loc)missing.push('location');
+  if(!comp)missing.push('competitor URL'); if(!handles)missing.push('social handles'); if(!skus)missing.push('hero SKUs');
+  if(!ds||!de)missing.push('campaign dates');
+  if(missing.length){ msg.innerHTML=`<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Missing required fields</div><div class="ibb">${missing.join(' · ')}</div></div>`; return; }
+  S.setup={budget,brand,loc,comp:comp.split('\n').filter(Boolean),handles:handles.split('\n').filter(Boolean),
+    skus:skus.split('\n').filter(Boolean),dateStart:ds,dateEnd:de,
+    floor:+document.getElementById('s-local-floor').value||70,
+    platforms:[...document.querySelectorAll('.s-plat:checked')].map(c=>c.value),
+    periods:[...document.querySelectorAll('.s-period:checked')].map(c=>c.value)};
+  unlockAll();
+  document.getElementById('floor-echo').textContent=S.setup.floor;
+  const sel=document.getElementById('c-sku'); sel.innerHTML=S.setup.skus.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('rec-inputs-echo').innerHTML=
+    `<strong>Budget:</strong> S$${budget.toLocaleString()}<br><strong>Market:</strong> ${loc} (creators ≥${S.setup.floor}% local)<br>`+
+    `<strong>Window:</strong> ${ds} → ${de}<br><strong>Platforms:</strong> ${S.setup.platforms.join(', ')}<br>`+
+    `<strong>Periods:</strong> ${S.setup.periods.join(', ')}<br><strong>SKUs:</strong> ${S.setup.skus.length} loaded<br><strong>Competitors:</strong> ${S.setup.comp.join(', ')}`;
+  msg.innerHTML=`<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Setup saved — pipeline unlocked</div><div class="ibb">All five steps are open. Your inputs drive every generation from here. Use "Export setup" (top right) to save this configuration as a JSON file for reuse.</div></div>`;
+  goStep(1);
+}
+function exportConfig(){
+  if(!S.setup){alert('Nothing to export yet — save Setup first.');return;}
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='dnuvo-pipeline-config.json'; a.click();
+}
+
+// ═══ STEP 1: CREATORS ═══
+async function sourceCreators(){
+  if(!S.setup){alert('Complete Setup first.');return;}
+  const tiers={nano:+t('t-nano'),micro:+t('t-micro'),mid:+t('t-mid'),macro:+t('t-macro'),mega:+t('t-mega')};
+  const total=Object.values(tiers).reduce((a,b)=>a+b,0);
+  if(!total){alert('Enter at least one creator count.');return;}
+  const backup=+t('t-backup');
+  const types=[['p-paid','paid UGC'],['p-gift','product gifting'],['p-live','LIVE co-hosts'],['p-affiliate','affiliate codes']]
+    .filter(([id])=>document.getElementById(id).checked).map(([,l])=>l);
+  const out=document.getElementById('creators-output');
+  out.innerHTML=`<div class="card"><div class="loading"><div class="spinner"></div><p>Running multi-actor sourcing for ${total} creators + ${backup} backups in ${S.setup.loc}...</p></div></div>`;
+  document.getElementById('btn-source').disabled=true;
+  const tierStr=Object.entries(tiers).filter(([,n])=>n>0).map(([k,n])=>`${n}× ${k}`).join(', ');
+  try{
+    const sourced = await api('/apify/kol-source', {
+      method:'POST',
+      body:{
+        campaignId:S.campaignId,
+        setup:S.setup,
+        tiers,
+        backup,
+        maxResults:Math.max(30,total*4),
+      },
+    });
+    const shortlist = sourced.shortlist || [];
+    const backups = sourced.backups || [];
+    S.sourcingData = sourced;
+    const debugPanel = renderRejectionDebugPanel(sourced.debug || {});
+
+    const aiBrief = await ai(`You are preparing d.nuvo outreach order.
+Market: ${S.setup.loc}. Tier request: ${tierStr}. Partnership types: ${types.join(', ')}.
+Use this shortlisted data only (already actor-sourced):
+${JSON.stringify(shortlist.slice(0, 20))}
+
+Output:
+1) OUTREACH ORDER (top 10) with one-line reason each.
+2) RISKS to verify before contracting (activity recency, audience location, authenticity).
+3) MESSAGE ANGLES by tier (nano/micro/mid/macro/mega) in bullet points.
+Keep concise.`);
+
+    S.creators = aiBrief;
+    out.innerHTML =
+      `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Multi-actor sourcing complete</div><div class="ibb">Actors used: ${(sourced.actorsUsed||[]).map(a=>a.actor).join(' · ')}<br>Total candidates scored: ${sourced.totalCandidates || 0} · Shortlist: ${shortlist.length} · Backups: ${backups.length}</div></div>`+
+      renderCreatorTable(shortlist, 'Shortlist — Highest Accuracy Candidates')+
+      renderCreatorTable(backups, 'Backup Pool')+
+      debugPanel+
+      `<div class="card"><div class="card-hd">AI Outreach Prioritization (from sourced list)</div>${md(aiBrief)}</div>`+
+      `<div class="ib ibg mt"><div class="ibl" style="color:#8A7000">Next action</div><div class="ibb">Copy profile URLs from shortlist and run Creator Link Verification Queue below before final outreach. Only proceed with live profiles.</div></div>`;
+    document.getElementById('rn-1').classList.add('done');document.getElementById('rl-1').classList.add('done');
+  }catch(e){
+    const isApifyMissing = /APIFY_TOKEN missing/i.test(e.message || '');
+    if (isApifyMissing) {
+      const text = await ai(`Source a creator list for d.nuvo as fallback mode.
+Market: ${S.setup.loc}. Local audience floor: ${S.setup.floor}% (hard rule).
+Tiers wanted: ${tierStr}. Backup alternates: ${backup}.
+Partnership types: ${types.join(', ')}.
+Brand: ${S.setup.brand}. Hero SKUs: ${S.setup.skus.join(' | ')}.
+Platforms: ${S.setup.platforms.join(', ')}.
+
+Output concise shortlist and backup list, mark all rows as PENDING LINK CHECK.`);
+      S.creators = text;
+      out.innerHTML = `<div class="ib ibg"><div class="ibl" style="color:#8A7000">APIFY token not configured</div><div class="ibb">Running fallback sourcing mode for preview/testing only. Add APIFY_TOKEN in environment variables for high-accuracy multi-actor sourcing.</div></div><div class="card"><div class="card-hd">Fallback Creator Draft</div>${md(text)}</div>`;
+      document.getElementById('rn-1').classList.add('done');document.getElementById('rl-1').classList.add('done');
+    } else {
+      out.innerHTML=`<div class="card"><div class="ib ibr"><div class="ibl" style="color:var(--rs)">Error</div><div class="ibb">${e.message}</div></div></div>`;
+    }
+  }
+  document.getElementById('btn-source').disabled=false;
+}
+
+async function verifyCreatorLinks(){
+  const urls = document.getElementById('v-urls').value
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean);
+  const out = document.getElementById('verify-output');
+  if(!urls.length){
+    out.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">No URLs provided</div><div class="ibb">Add one profile URL per line.</div></div>`;
+    return;
+  }
+  out.innerHTML = `<div class="loading"><div class="spinner"></div><p>Verifying ${urls.length} profile links...</p></div>`;
+  try{
+    const data = await api('/verify-creator', { method:'POST', body:{ urls } });
+    S.verifications = data.results || [];
+    const ok = S.verifications.filter(r => (r.verdict || '').startsWith('live')).length;
+    const blocked = S.verifications.filter(r => (r.verdict || '').startsWith('blocked')).length;
+    const dead = S.verifications.filter(r => (r.verdict || '').startsWith('dead')).length;
+    const rows = S.verifications.map(r => `<tr><td>${r.url}</td><td>${r.httpStatus || 'n/a'}</td><td>${r.verdict}</td></tr>`).join('');
+    out.innerHTML =
+      `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Verification complete</div><div class="ibb">Live: ${ok} · Blocked: ${blocked} · Dead: ${dead} · Checked: ${new Date(data.checkedAt).toLocaleString()}</div></div>`+
+      `<table class="dt mt"><thead><tr><th>URL</th><th>HTTP</th><th>Verdict</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){
+    out.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Verification failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+function t(id){return document.getElementById(id).value;}
+
+// ═══ STEP 2: CONTENT ═══
+async function buildContent(){
+  const sku=t('c-sku'),fmt=t('c-format'),hook=t('c-hook'),n=+t('c-count');
+  const out=document.getElementById('content-output');
+  out.innerHTML=`<div class="card"><div class="loading"><div class="spinner"></div><p>Writing ${n} scripts...</p></div></div>`;
+  try{
+    const text=await ai(`Write ${n} UGC video scripts for d.nuvo.
+SKU: ${sku}. Format: ${fmt}. Hook angle: ${hook}. Market: ${S.setup.loc}.
+For each script: title, hook line (first 3 seconds, spoken), beat-by-beat shot list with timestamps, on-screen text, CTA (drive to ${S.setup.platforms.includes('Shopee')?'Shopee listing':'store'} + affiliate code placeholder [CODE]), and a Spark-Ad-ready caption with 5 hashtags (include #sgskintok if SG).`);
+    S.content.push({type:'scripts',sku,text});
+    out.innerHTML=`<div class="card"><div class="card-hd">Scripts — ${sku.slice(0,50)}</div>${md(text)}</div>`;
+    document.getElementById('rn-2').classList.add('done');document.getElementById('rl-2').classList.add('done');
+  }catch(e){out.innerHTML=`<div class="card"><div class="ib ibr"><div class="ibl" style="color:var(--rs)">Error</div><div class="ibb">${e.message}</div></div></div>`;}
+}
+async function buildEditBrief(){
+  const footage=t('c-footage').trim(); if(!footage){alert('Describe your footage first.');return;}
+  const clips=+t('c-clips');
+  const out=document.getElementById('content-output');
+  out.innerHTML=`<div class="card"><div class="loading"><div class="spinner"></div><p>Writing edit brief for ${clips} clips...</p></div></div>`;
+  try{
+    const text=await ai(`Write a cut-by-cut edit brief producing ${clips} short clips from this real footage:\n"${footage}"\nFor each clip: source timestamp range, target length (15-45s), hook (what plays in first 2s), cuts/zooms/captions, audio note (keep original / TTS overlay / trending sound), platform target from [${S.setup.platforms.join(', ')}], and export spec (9:16 1080x1920). Only reference moments the user actually described — do not invent footage.`);
+    S.content.push({type:'edit',text});
+    out.innerHTML=`<div class="card"><div class="card-hd">Edit Brief — from your footage</div>${md(text)}</div>`;
+  }catch(e){out.innerHTML=`<div class="card"><div class="ib ibr"><div class="ibl" style="color:var(--rs)">Error</div><div class="ibb">${e.message}</div></div></div>`;}
+}
+
+// ═══ SCHEDULE ═══
+function buildSchedule(){
+  if(!S.setup){alert('Complete Setup first.');return;}
+  const freq=+t('sch-freq');
+  const start=new Date(S.setup.dateStart), end=new Date(S.setup.dateEnd);
+  const days=Math.min(Math.round((end-start)/864e5)+1, 42); // cap display at 6 weeks
+  const slots=['12:00','18:00','21:00'];
+  const plats=S.setup.platforms;
+  S.schedule=[];
+  // spread: freq posts/week/platform → post every ceil(7/freq) days, platforms rotate slots
+  const gap=Math.max(1,Math.floor(7/freq));
+  for(let d=0;d<days;d++){
+    const date=new Date(start); date.setDate(start.getDate()+d);
+    if(d%gap!==0) continue;
+    plats.forEach((p,i)=>{
+      S.schedule.push({date:date.toISOString().slice(0,10),time:slots[i%3],platform:p,content:'[assign clip/script]',status:'planned'});
+    });
+  }
+  // render calendar (first 4 weeks)
+  let html='<div class="cal-grid">';
+  const specials=S.setup.periods.filter(p=>p!=='BAU');
+  for(let d=0;d<Math.min(days,28);d++){
+    const date=new Date(start); date.setDate(start.getDate()+d);
+    const iso=date.toISOString().slice(0,10);
+    const posts=S.schedule.filter(s=>s.date===iso);
+    const isSpecial=[9,10,11,12].some(m=>date.getMonth()+1===m&&date.getDate()===m)&&specials.length;
+    html+=`<div class="cal-cell ${isSpecial?'cal-special':''}"><div class="cal-day">${date.getDate()}/${date.getMonth()+1}${isSpecial?' ⭐':''}</div>`;
+    posts.forEach(p=>{const cls={'TikTok':'cp-tt','Instagram':'cp-ig','Facebook':'cp-fb','Shopee':'cp-sp','Lazada':'cp-lz','Shopify':'cp-sf'}[p.platform]||'cp-tt';
+      html+=`<div class="cal-post ${cls}">${p.time} ${p.platform}</div>`;});
+    html+='</div>';
+  }
+  html+='</div>';
+  document.getElementById('schedule-output').innerHTML=
+    `<div style="font-size:11px;color:var(--sl);margin-bottom:8px"><strong>${S.schedule.length} posts</strong> scheduled across ${plats.length} platforms · ${freq}×/week each · ⭐ = mega-sale date weighting${days>28?' · showing first 4 weeks':''}</div>`+html;
+}
+function exportScheduleCSV(){
+  if(!S.schedule.length){alert('Build the schedule first.');return;}
+  const csv='date,time,platform,content,status\n'+S.schedule.map(s=>`${s.date},${s.time},${s.platform},"${s.content}",${s.status}`).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='dnuvo-media-schedule.csv'; a.click();
+}
+
+async function queueSchedule(){
+  if(!S.schedule.length){alert('Build the schedule first.');return;}
+  const out=document.getElementById('queue-output');
+  out.innerHTML = `<div class="loading"><div class="spinner"></div><p>Sending ${S.schedule.length} posts to backend queue...</p></div>`;
+  try{
+    const data = await api('/schedule', { method:'POST', body:{ posts:S.schedule, campaignId:S.campaignId } });
+    out.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Queue updated</div><div class="ibb">Queued now: ${data.queued}. Total queued records: ${data.total}. Scheduler can now post due content automatically.</div></div>`;
+    await loadCampaignAudit();
+    await refreshQueueStatus();
+  }catch(e){
+    out.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Queue failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function processQueueNow(){
+  const out=document.getElementById('queue-output');
+  out.innerHTML = `<div class="loading"><div class="spinner"></div><p>Running due posts now...</p></div>`;
+  try{
+    const data = await api('/schedule/process-now', { method:'POST' });
+    out.innerHTML = `<div class="ib ibg"><div class="ibl" style="color:#8A7000">Process run complete</div><div class="ibb">Processed due posts: ${data.processed}. Total queue records: ${data.total}. Run time: ${new Date(data.runAt).toLocaleString()}.</div></div>`;
+    await refreshQueueStatus();
+  }catch(e){
+    out.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Process run failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function refreshQueueStatus(){
+  const out=document.getElementById('queue-output');
+  try{
+    const data = await api('/schedule/summary');
+    const c = data.counts || {};
+    const next = data.nextQueuedPost
+      ? `${data.nextQueuedPost.date} ${data.nextQueuedPost.time} · ${data.nextQueuedPost.platform}`
+      : 'none';
+    out.innerHTML =
+      `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Live queue status</div><div class="ibb">Total: ${data.total} · Queued: ${c.queued||0} · Posted: ${c.posted||0} · Failed: ${c.failed||0} · Manual: ${c.manual||0}<br>Next queued post: ${next}</div></div>`;
+  }catch(e){
+    out.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Queue status unavailable</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+// ═══ STEP 3: RECOMMEND ═══
+async function buildRecommendations(){
+  const mods=[...document.querySelectorAll('.rec-mod:checked')].map(c=>c.value);
+  if(!mods.length){alert('Select at least one module.');return;}
+  const out=document.getElementById('rec-output');
+  out.innerHTML=`<div class="card"><div class="loading"><div class="spinner"></div><p>Generating ${mods.length} strategy modules from your setup...</p></div></div>`;
+  const names={channel:'Channel strategy (Shopee, TikTok Shop, Lazada, Shopify)',ads:'Ads plan (Spark, Shopee Ads, Meta)',pricing:`Pricing vs competitors: ${S.setup.comp.join(', ')} — position d.nuvo SKUs (${S.setup.skus.join(' | ')}) on skincare pain points solved`,crm:'CRM: lead capture, nurture flows, retention/LTV'};
+  try{
+    const results=await Promise.all(mods.map(m=>ai(`d.nuvo strategy module: ${names[m]}.
+Budget S$${S.setup.budget.toLocaleString()}. Market ${S.setup.loc}. Window ${S.setup.dateStart} to ${S.setup.dateEnd}. Periods: ${S.setup.periods.join(', ')}. Platforms: ${S.setup.platforms.join(', ')}.
+Give specific, executable actions with effort (Low/Med/High), timeline, and expected impact (Trust/ROAS/Both). Respect the 15-Shopee-review gate before any paid ads. Base pricing analysis only on the competitor URLs provided; if live prices unknown, state what to check rather than inventing numbers.`)));
+    out.innerHTML=results.map((r,i)=>`<div class="card mb"><div class="card-hd">${names[mods[i]].split('(')[0]}</div>${md(r)}</div>`).join('');
+    document.getElementById('rn-3').classList.add('done');document.getElementById('rl-3').classList.add('done');
+  }catch(e){out.innerHTML=`<div class="card"><div class="ib ibr"><div class="ibl" style="color:var(--rs)">Error</div><div class="ibb">${e.message}</div></div></div>`;}
+}
+
+// ═══ STEP 4: BUDGET & KPI ═══
+function buildBudget(){
+  if(!S.setup){alert('Complete Setup first.');return;}
+  const b=S.setup.budget;
+  const tiers={nano:+t('t-nano'),micro:+t('t-micro'),mid:+t('t-mid'),macro:+t('t-macro'),mega:+t('t-mega')};
+  const mid={nano:150,micro:750,mid:3000,macro:10000,mega:18000};
+  let creatorCost=0; Object.keys(tiers).forEach(k=>creatorCost+=tiers[k]*mid[k]);
+  const rows=[];
+  if(creatorCost>0){
+    const scale=Math.min(1, b*0.5/creatorCost); // creators capped at 50% budget
+    rows.push(['Creator partnerships',Math.round(creatorCost*scale),Object.entries(tiers).filter(([,n])=>n).map(([k,n])=>`${n}×${k}`).join(', ')+(scale<1?' (scaled to fit 50% cap — reduce counts or raise budget)':'')]);
+  }
+  const rem=b-(rows[0]?rows[0][1]:0);
+  rows.push(['Paid ads (Spark + Shopee, post-review-gate)',Math.round(rem*0.5),'Activates only after 15 Shopee reviews']);
+  rows.push(['Content production & editing',Math.round(rem*0.25),'AI UGC + edits from your footage']);
+  rows.push(['CRM & tools',Math.round(rem*0.15),'Klaviyo, Judge.me, QR cards']);
+  rows.push(['Contingency',Math.round(rem*0.10),'Flash-sale vouchers / top-up winning ads']);
+  const total=rows.reduce((a,r)=>a+r[1],0);
+  S.budget=rows;
+  document.getElementById('budget-view').outerHTML=`<div id="budget-view"><table class="dt"><thead><tr><th>Line</th><th>S$</th><th>Note</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td style="font-weight:700">S$${r[1].toLocaleString()}</td><td>${r[2]}</td></tr>`).join('')}<tr style="background:var(--gdbg)"><td><strong>Total</strong></td><td><strong>S$${total.toLocaleString()}</strong></td><td>vs input S$${b.toLocaleString()}</td></tr></tbody></table></div>`;
+  document.getElementById('rn-4').classList.add('done');document.getElementById('rl-3').classList.add('done');
+}
+function calcKPI(){
+  const spend=+t('k-spend'),rev=+t('k-rev'),orders=+t('k-orders'),leads=+t('k-leads'),views=+t('k-views'),clicks=+t('k-clicks');
+  S.kpiLatest = { spend, revenue:rev, orders, leads, views, clicks };
+  const out=document.getElementById('kpi-output');
+  if(!spend&&!rev&&!orders&&!leads&&!views&&!clicks){ out.innerHTML=`<div class="empty" style="grid-column:span 4"><h4>No actuals entered</h4><p>KPIs compute only from real numbers you enter — nothing is simulated.</p></div>`; return; }
+  const roas=spend>0?(rev/spend).toFixed(2)+'×':'—';
+  const cpl=(spend>0&&leads>0)?'S$'+(spend/leads).toFixed(2):'—';
+  const aov=orders>0?'S$'+(rev/orders).toFixed(2):'—';
+  const cr=(clicks>0&&orders>0)?((orders/clicks)*100).toFixed(2)+'%':'—';
+  const cpv=(spend>0&&views>0)?'S$'+(spend/views).toFixed(4):'—';
+  const ctr=(views>0&&clicks>0)?((clicks/views)*100).toFixed(2)+'%':'—';
+  const roasOk=spend>0&&(rev/spend)>=1.5;
+  out.innerHTML=
+    `<div class="kpi ${roasOk?'kS':'kR'}"><div class="klbl">ROAS</div><div class="kval ${roasOk?'vS':'vR'}">${roas}</div><div class="knote">Target ≥1.5× (M2) / ≥3.5× (M3)</div></div>`+
+    `<div class="kpi kB"><div class="klbl">CPL</div><div class="kval vB">${cpl}</div><div class="knote">Target ≤ S$3</div></div>`+
+    `<div class="kpi kG"><div class="klbl">AOV</div><div class="kval vG">${aov}</div><div class="knote">${orders} orders · S$${rev.toLocaleString()} revenue</div></div>`+
+    `<div class="kpi kT"><div class="klbl">Conversion rate</div><div class="kval vT">${cr}</div><div class="knote">CTR ${ctr} · CPV ${cpv}</div></div>`;
+}
+
+function readKpiForm(){
+  return {
+    spend:+t('k-spend'),
+    revenue:+t('k-rev'),
+    orders:+t('k-orders'),
+    leads:+t('k-leads'),
+    views:+t('k-views'),
+    clicks:+t('k-clicks'),
+  };
+}
+
+function fillKpiForm(entry){
+  if(!entry) return;
+  document.getElementById('k-spend').value = entry.spend ?? '';
+  document.getElementById('k-rev').value = entry.revenue ?? '';
+  document.getElementById('k-orders').value = entry.orders ?? '';
+  document.getElementById('k-leads').value = entry.leads ?? '';
+  document.getElementById('k-views').value = entry.views ?? '';
+  document.getElementById('k-clicks').value = entry.clicks ?? '';
+}
+
+async function saveKpiEntry(){
+  const msg = document.getElementById('kpi-msg');
+  if(!S.campaignId){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Campaign required</div><div class="ibb">Save a campaign snapshot first, then save KPI entries.</div></div>`;
+    return;
+  }
+  const payload = readKpiForm();
+  try{
+    const data = await api(`/campaigns/${S.campaignId}/kpi`, { method:'POST', body:payload });
+    S.kpiLatest = data.entry;
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">KPI saved</div><div class="ibb">Entry saved at ${new Date(data.entry.createdAt).toLocaleString()}.</div></div>`;
+    await loadKpiHistory();
+    await loadCampaignAudit();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">KPI save failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function loadKpiHistory(){
+  const history = document.getElementById('kpi-history');
+  if(!S.campaignId){
+    history.innerHTML = '';
+    return;
+  }
+  try{
+    const data = await api(`/campaigns/${S.campaignId}/kpi?limit=20`);
+    S.kpiLatest = data.latest || null;
+    S.kpiHistory = data.history || [];
+    if (S.kpiLatest) {
+      fillKpiForm(S.kpiLatest);
+      calcKPI();
+    }
+    if (!S.kpiHistory.length) {
+      history.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">KPI history</div><div class="ibb">No saved KPI entries yet for this campaign.</div></div>`;
+      return;
+    }
+    const rows = S.kpiHistory.map((k) =>
+      `<tr><td>${new Date(k.createdAt).toLocaleString()}</td><td>S$${Number(k.spend||0).toLocaleString()}</td><td>S$${Number(k.revenue||0).toLocaleString()}</td><td>${k.orders||0}</td><td>${k.metrics?.roas ?? '—'}${k.metrics?.roas ? '×' : ''}</td><td>${k.metrics?.ctr ?? '—'}${k.metrics?.ctr ? '%' : ''}</td></tr>`
+    ).join('');
+    history.innerHTML = `<table class="dt"><thead><tr><th>Timestamp</th><th>Spend</th><th>Revenue</th><th>Orders</th><th>ROAS</th><th>CTR</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){
+    history.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">KPI history unavailable</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function loadCampaignAudit(){
+  const out = document.getElementById('audit-output');
+  if(!S.campaignId){
+    out.innerHTML = '';
+    return;
+  }
+  try{
+    const data = await api(`/campaigns/${S.campaignId}/audit?limit=12`);
+    const items = data.items || [];
+    if(!items.length){
+      out.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Campaign audit trail</div><div class="ibb">No logged actions yet.</div></div>`;
+      return;
+    }
+    const rows = items.map((a) => `<tr><td>${new Date(a.createdAt).toLocaleString()}</td><td>${a.action}</td><td>${a.actor}</td><td>${JSON.stringify(a.details || {})}</td></tr>`).join('');
+    out.innerHTML = `<div class="card"><div class="card-hd">Campaign audit trail</div><table class="dt"><thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Details</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }catch(e){
+    out.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Audit unavailable</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+// ═══ MARKDOWN-LITE RENDERER ═══
+function md(text){
+  return text.split('\n').filter(l=>l.trim()).map(l=>{
+    const c=l.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/^#+\s*/,'');
+    if(/^###|^##|^\d+\.\s+[A-Z@]/.test(l)) return `<div style="font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:var(--ink);margin:12px 0 4px">${c}</div>`;
+    if(/^[-•]/.test(l)) return `<div style="display:flex;gap:6px;margin-bottom:3px;font-size:12px;color:var(--sl)"><span style="color:var(--gd)">•</span><div>${c.replace(/^[-•]\s*/,'')}</div></div>`;
+    if(/PENDING LINK CHECK/i.test(l)) return `<div style="margin:2px 0 8px"><span class="verify-badge">⏳ pending link check</span></div>`;
+    return `<p style="font-size:12px;color:var(--sl);line-height:1.75;margin-bottom:5px">${c}</p>`;
+  }).join('');
+}
+
+function renderCreatorTable(items, title){
+  if(!items || !items.length) return `<div class="ib ibg"><div class="ibl" style="color:#8A7000">${title}</div><div class="ibb">No candidates found.</div></div>`;
+  const rows = items.map((c, i) => `
+    <tr>
+      <td>${i+1}. ${c.name || 'Unknown'} ${c.handle ? `(@${c.handle})` : ''}</td>
+      <td>${c.platform || 'Unknown'}</td>
+      <td>${c.followers ? Number(c.followers).toLocaleString() : 'n/a'}</td>
+      <td>${c.engagementRate ? `${c.engagementRate}%` : 'n/a'}</td>
+      <td>${c.location || 'n/a'}</td>
+      <td>${c.localConfidence !== undefined ? `${Math.round(c.localConfidence*100)}%` : 'n/a'}</td>
+      <td>${c.score || 0}</td>
+      <td>${c.profileUrl ? `<a href="${c.profileUrl}" target="_blank" rel="noreferrer">open</a>` : 'n/a'}</td>
+    </tr>
+  `).join('');
+  return `
+    <div class="card mb">
+      <div class="card-hd">${title}</div>
+      <table class="dt">
+        <thead><tr><th>Creator</th><th>Platform</th><th>Followers</th><th>ER</th><th>Location</th><th>SG local conf.</th><th>Score</th><th>Profile</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderRejectionDebugPanel(debug){
+  if(!debug || !debug.rejected) return '';
+  const rej = debug.rejected;
+  const lines = [
+    { key:'missing_profile_url', label:'Missing profile URL' },
+    { key:'below_tier_floor', label:'Below tier follower floor' },
+    { key:'low_sg_confidence', label:'Low SG confidence' },
+    { key:'missing_followers', label:'Missing followers' },
+    { key:'unknown_tier', label:'Unknown tier' },
+  ];
+
+  const summary = lines
+    .map((x) => `<tr><td>${x.label}</td><td>${(rej[x.key] || []).length}</td></tr>`)
+    .join('');
+
+  const sampleRows = [];
+  lines.forEach((x) => {
+    (rej[x.key] || []).slice(0, 3).forEach((r) => {
+      sampleRows.push(`<tr><td>${x.label}</td><td>${r.platform || 'n/a'}</td><td>${r.handle ? `@${r.handle}` : 'n/a'}</td><td>${r.followers || 'n/a'}</td><td>${r.tier || 'n/a'}</td><td>${r.localConfidence !== undefined ? Math.round(r.localConfidence*100)+'%' : 'n/a'}</td><td>${r.profileUrl ? `<a href="${r.profileUrl}" target="_blank" rel="noreferrer">open</a>` : 'n/a'}</td></tr>`);
+    });
+  });
+
+  return `
+    <div class="card mb">
+      <div class="card-hd">Sourcing Rejection Debug</div>
+      <div class="g2" style="gap:12px">
+        <div>
+          <table class="dt">
+            <thead><tr><th>Reason</th><th>Count</th></tr></thead>
+            <tbody>${summary}</tbody>
+          </table>
+        </div>
+        <div class="ib ibsk">
+          <div class="ibl" style="color:var(--sk)">Pipeline stats</div>
+          <div class="ibb">Raw candidates: ${debug.totalRawCandidates || 0}<br>Deduped candidates: ${debug.dedupedCandidates || 0}</div>
+        </div>
+      </div>
+      ${sampleRows.length ? `<div class="mt"><table class="dt"><thead><tr><th>Reason</th><th>Platform</th><th>Handle</th><th>Followers</th><th>Tier</th><th>SG conf.</th><th>Profile</th></tr></thead><tbody>${sampleRows.join('')}</tbody></table></div>` : ''}
+    </div>
+  `;
+}
+
+function csvCell(v){
+  const s = String(v ?? '');
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function exportSourcingAllCSV(){
+  const data = S.sourcingData;
+  if(!data){
+    alert('Run Source Creators first to generate export data.');
+    return;
+  }
+
+  const headers = [
+    'bucket',
+    'rejectionReason',
+    'platform',
+    'name',
+    'handle',
+    'profileUrl',
+    'followers',
+    'engagementRate',
+    'tier',
+    'location',
+    'localConfidence',
+    'score',
+  ];
+
+  const rows = [];
+  (data.shortlist || []).forEach((c) => rows.push({
+    bucket:'shortlist', rejectionReason:'', platform:c.platform, name:c.name, handle:c.handle,
+    profileUrl:c.profileUrl, followers:c.followers, engagementRate:c.engagementRate,
+    tier:c.tier, location:c.location, localConfidence:c.localConfidence, score:c.score,
+  }));
+  (data.backups || []).forEach((c) => rows.push({
+    bucket:'backup', rejectionReason:'', platform:c.platform, name:c.name, handle:c.handle,
+    profileUrl:c.profileUrl, followers:c.followers, engagementRate:c.engagementRate,
+    tier:c.tier, location:c.location, localConfidence:c.localConfidence, score:c.score,
+  }));
+
+  const rej = data.debug?.rejected || {};
+  Object.keys(rej).forEach((reason) => {
+    (rej[reason] || []).forEach((r) => rows.push({
+      bucket:'rejected', rejectionReason:reason, platform:r.platform, name:r.name || '', handle:r.handle,
+      profileUrl:r.profileUrl, followers:r.followers, engagementRate:r.engagementRate || '',
+      tier:r.tier, location:r.location || '', localConfidence:r.localConfidence, score:'',
+    }));
+  });
+
+  const csv = [headers.join(',')]
+    .concat(rows.map((r) => headers.map((h) => csvCell(r[h])).join(',')))
+    .join('\n');
+
+  const ts = new Date().toISOString().replace(/[:.]/g,'-');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = `dnuvo-kol-sourcing-all-${ts}.csv`;
+  a.click();
+}
+
+checkBackend();
+loadCampaignList();
+setInterval(checkBackend, 30000);
+setInterval(() => {
+  if (document.getElementById('pg-2').classList.contains('on')) refreshQueueStatus();
+}, 45000);
+</script>
+</body>
+</html>

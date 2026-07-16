@@ -1,0 +1,53 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/api/health"
+  status = 200
+
+[[redirects]]
+  from = "/verify-creator"
+  to = "/.netlify/functions/api/verify-creator"
+  status = 200
+
+[[redirects]]
+  from = "/apify/*"
+  to = "/.netlify/functions/api/apify/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/campaigns"
+  to = "/.netlify/functions/api/campaigns"
+  status = 200
+
+[[redirects]]
+  from = "/campaigns/*"
+  to = "/.netlify/functions/api/campaigns/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/ai/*"
+  to = "/.netlify/functions/api/ai/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/schedule"
+  to = "/.netlify/functions/api/schedule"
+  status = 200
+
+[[redirects]]
+  from = "/schedule/*"
+  to = "/.netlify/functions/api/schedule/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/post/*"
+  to = "/.netlify/functions/api/post/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/kpi/*"
+  to = "/.netlify/functions/api/kpi/:splat"
+  status = 200
