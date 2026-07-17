@@ -636,7 +636,8 @@ function renderAdvertiserPanel(){
       <td>${a.logo ? `<img src="${a.logo}" alt="" style="height:18px;vertical-align:middle;margin-right:6px">` : ''}${a.brand}</td>
       <td>${a.company}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:10px">${a.accessCode}</td>
-      <td>${a.id === AUTH.activeAdvertiserId ? '<span class="tag tG">active</span>' : `<button class="btn btn-outline btn-sm" onclick="setActiveAdvertiser(${a.id})">Work under</button>`}</td>
+      <td>${a.id === AUTH.activeAdvertiserId ? '<span class="tag tG">active</span>' : `<button class="btn btn-outline btn-sm" onclick="setActiveAdvertiser(${a.id})">Work under</button>`}
+          <button class="btn btn-outline btn-sm" style="border-color:var(--rs);color:var(--rs)" onclick="deleteAdvertiserRow(${a.id},'${a.brand.replace(/'/g,'&#39;')}')">Delete</button></td>
     </tr>`).join('');
   host.innerHTML = `
     <div class="ib ibg mb"><div class="ibl" style="color:#8A7000">Super admin repository</div><div class="ibb">All advertisers registered under the SocialMIND master network. "Work under" selects which advertiser new campaigns are filed to; share the access code with the advertiser for their scoped login.</div></div>
@@ -709,6 +710,21 @@ async function saveAdvertiserProfile(){
       : `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Advertiser created</div><div class="ibb">${brand} registered under SocialMIND. Advertiser access code: <strong style="font-family:'JetBrains Mono',monospace">${data.advertiser.accessCode}</strong> — share this for their scoped login.</div></div>`;
   }catch(e){
     msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Save failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function deleteAdvertiserRow(id, brand){
+  const msg = document.getElementById('adv-msg');
+  if(!confirm(`Super admin: delete advertiser ${brand}? Only possible when it has no campaigns left in the repository.`)) return;
+  try{
+    await api(`/advertisers/${id}`, { method:'DELETE' });
+    if(AUTH.activeAdvertiserId === id) AUTH.activeAdvertiserId = null;
+    await refreshAdvertisers();
+    renderAdvertiserPanel();
+    renderAdvertiserPill();
+    document.getElementById('adv-msg').innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Advertiser deleted</div><div class="ibb">${brand} removed from the SocialMIND repository.</div></div>`;
+  }catch(e){
+    if(msg) msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Delete failed</div><div class="ibb">${e.message}</div></div>`;
   }
 }
 

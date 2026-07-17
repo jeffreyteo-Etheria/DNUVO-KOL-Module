@@ -15,14 +15,16 @@ const dbPath = path.join(dataDir, 'pipeline.db');
 const BLOB_KEY = 'pipeline.db';
 let db;
 let storageMode = 'file';
+let storageError = null;
 let blobWriteChain = Promise.resolve();
 
 function getBlobStore() {
   if (!isServerless) return null;
   try {
     const { getStore } = require('@netlify/blobs');
-    return getStore({ name: 'socialmind-db', consistency: 'strong' });
-  } catch (_) {
+    return getStore({ name: 'socialmind-db' });
+  } catch (e) {
+    storageError = 'getStore: ' + e.message;
     return null;
   }
 }
@@ -35,8 +37,8 @@ function persistDb() {
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     blobWriteChain = blobWriteChain
       .then(() => store.set(BLOB_KEY, buf))
-      .then(() => { storageMode = 'netlify-blobs'; })
-      .catch((e) => console.error('Blob persist failed:', e.message));
+      .then(() => { storageMode = 'netlify-blobs'; storageError = null; })
+      .catch((e) => { storageError = 'set: ' + e.message; console.error('Blob persist failed:', e.message); });
   }
 }
 
@@ -76,6 +78,7 @@ async function loadDbBytes() {
       }
       storageMode = 'netlify-blobs';
     } catch (e) {
+      storageError = 'get: ' + e.message;
       console.error('Blob load failed, falling back to file:', e.message);
     }
   }
@@ -84,7 +87,7 @@ async function loadDbBytes() {
 }
 
 function getStorageMode() {
-  return storageMode;
+  return storageError ? `${storageMode} (${storageError})` : storageMode;
 }
 
 async function initDb() {
@@ -329,6 +332,16 @@ async function getCampaign(id) {
   };
 }
 
+async function deleteAdvertiser(id) {
+  const owned = get('SELECT COUNT(*) AS n FROM campaigns WHERE advertiser_id = ?', [id]);
+  if (owned && owned.n) {
+    throw new Error(`Advertiser still has ${owned.n} campaign(s) in the repository. Delete those first.`);
+  }
+  const res = run('DELETE FROM advertisers WHERE id = ?', [id]);
+  persistDb();
+  return res.changes > 0;
+}
+
 async function deleteCampaign(id) {
   run('DELETE FROM campaign_kpi_entries WHERE campaign_id = ?', [id]);
   run('DELETE FROM campaign_audit_logs WHERE campaign_id = ?', [id]);
@@ -428,6 +441,7 @@ module.exports = {
   listAdvertisers,
   getAdvertiser,
   getAdvertiserByCode,
+  deleteAdvertiser,
   saveCampaign,
   listCampaigns,
   getCampaign,

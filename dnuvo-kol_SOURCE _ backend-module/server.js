@@ -16,6 +16,7 @@ const {
   listAdvertisers,
   getAdvertiser,
   getAdvertiserByCode,
+  deleteAdvertiser,
   saveCampaign,
   listCampaigns,
   getCampaign,
@@ -234,6 +235,23 @@ app.post('/advertisers', async (req, res) => {
     res.json({ saved: true, advertiser: await getAdvertiser(newId) });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/advertisers/:id', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    if (access.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only super admin can delete advertisers.' });
+    }
+    const id = Number(req.params.id);
+    const advertiser = await getAdvertiser(id);
+    if (!advertiser) return res.status(404).json({ error: 'Advertiser not found' });
+    const deleted = await deleteAdvertiser(id);
+    res.json({ deleted, id, brand: advertiser.brand });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
 });
 
