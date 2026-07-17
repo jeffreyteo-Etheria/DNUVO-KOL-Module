@@ -12,6 +12,8 @@ const { sourceKolMultiActor } = require('./src/apifySource');
 const {
   initDb,
   getStorageMode,
+  peekQuota,
+  consumeQuota,
   saveAdvertiser,
   listAdvertisers,
   getAdvertiser,
@@ -42,10 +44,13 @@ const save = (d) => fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(d, null, 2));
 // Super admin sees every advertiser and campaign; an advertiser access code
 // scopes all campaign data to that advertiser only.
 const SUPER_ADMIN_CODE = process.env.SUPER_ADMIN_CODE || 'SOCIALMIND-MASTER';
+// Pre-launch open access: requests without a code are treated as super admin.
+// Set OPEN_ACCESS=false in the environment to re-enable the access-code gate.
+const OPEN_ACCESS = process.env.OPEN_ACCESS !== 'false';
 
 async function resolveAccess(req) {
   const code = String(req.headers['x-access-code'] || '').trim();
-  if (!code) return null;
+  if (!code) return OPEN_ACCESS ? { role: 'superadmin', advertiser: null } : null;
   if (code === SUPER_ADMIN_CODE) return { role: 'superadmin', advertiser: null };
   const advertiser = await getAdvertiserByCode(code);
   if (advertiser) return { role: 'advertiser', advertiser };
@@ -76,10 +81,76 @@ async function requireCampaignAccess(req, res, campaignId) {
   return { access, campaign };
 }
 
+// ── Usage quotas (cost control for scraping / AI / verification) ───────────
+// Every user gets a fixed budget per window; the paid API tools (Apify, Claude)
+// sit behind these. Identity: the true super admin code is exempt, an advertiser
+// code is one budget, and anonymous open-access visitors are keyed by the
+// browser client id (falling back to IP). Override any limit via env.
+const QUOTA_WINDOW_HOURS = Number(process.env.QUOTA_WINDOW_HOURS) || 12;
+const QUOTA_WINDOW_MS = QUOTA_WINDOW_HOURS * 60 * 60 * 1000;
+const QUOTAS = {
+  kol_results:   { limit: Number(process.env.QUOTA_KOL_RESULTS) || 20,   label: 'KOL search results' },
+  sourcing_runs: { limit: Number(process.env.QUOTA_SOURCING_RUNS) || 3,  label: 'KOL sourcing runs' },
+  ai_calls:      { limit: Number(process.env.QUOTA_AI_CALLS) || 20,      label: 'AI generations' },
+  verify_urls:   { limit: Number(process.env.QUOTA_VERIFY_URLS) || 40,   label: 'creator link checks' },
+};
+
+function quotaIdentity(req) {
+  const code = String(req.headers['x-access-code'] || '').trim();
+  if (code === SUPER_ADMIN_CODE) return null; // real super admin: no limits
+  if (code) return `code:${code}`;
+  const clientId = String(req.headers['x-client-id'] || '').trim().slice(0, 64);
+  if (clientId) return `anon:${clientId}`;
+  const fwd = String(req.headers['x-nf-client-connection-ip'] || req.headers['x-forwarded-for'] || req.ip || '');
+  return `ip:${fwd.split(',')[0].trim() || 'unknown'}`;
+}
+
+function quotaRejection(res, metric, result) {
+  const q = QUOTAS[metric];
+  const resetSgt = new Date(result.resetAt).toLocaleString('en-SG', { timeZone: 'Asia/Singapore', hour12: false });
+  res.status(429).json({
+    error: `Usage limit reached: ${q.limit} ${q.label} per ${QUOTA_WINDOW_HOURS}h. Your allowance resets ${resetSgt} SGT.`,
+    quota: { metric, ...result },
+  });
+}
+
+// Consumes `amount` from the metric; on rejection writes the 429 and returns null.
+async function requireQuota(req, res, metric, amount = 1) {
+  const userKey = quotaIdentity(req);
+  if (!userKey) return { exempt: true };
+  const q = QUOTAS[metric];
+  const result = await consumeQuota({ userKey, metric, amount, limit: q.limit, windowMs: QUOTA_WINDOW_MS });
+  if (!result.allowed) {
+    quotaRejection(res, metric, result);
+    return null;
+  }
+  return result;
+}
+
+app.get('/quota', async (req, res) => {
+  try {
+    const userKey = quotaIdentity(req);
+    if (!userKey) return res.json({ exempt: true, windowHours: QUOTA_WINDOW_HOURS, metrics: {} });
+    const metrics = {};
+    for (const [metric, q] of Object.entries(QUOTAS)) {
+      metrics[metric] = {
+        label: q.label,
+        ...(await peekQuota({ userKey, metric, limit: q.limit, windowMs: QUOTA_WINDOW_MS })),
+      };
+    }
+    res.json({ exempt: false, windowHours: QUOTA_WINDOW_HOURS, metrics });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/auth/login', async (req, res) => {
   try {
     const code = String((req.body || {}).accessCode || '').trim();
-    if (!code) return res.status(400).json({ error: 'accessCode required' });
+    if (!code) {
+      if (OPEN_ACCESS) return res.json({ role: 'superadmin', advertiser: null, openAccess: true });
+      return res.status(400).json({ error: 'accessCode required' });
+    }
     if (code === SUPER_ADMIN_CODE) return res.json({ role: 'superadmin', advertiser: null });
     const advertiser = await getAdvertiserByCode(code);
     if (advertiser) return res.json({ role: 'advertiser', advertiser });
@@ -148,8 +219,9 @@ async function processQueuedPosts(now = new Date()) {
 // POST /verify-creator { "urls": ["https://www.tiktok.com/@handle", ...] }
 // Returns per-URL: live (HTTP 200), redirected, dead, or blocked.
 app.post('/verify-creator', async (req, res) => {
-  const urls = req.body.urls || [];
+  const urls = (req.body.urls || []).slice(0, 20); // hard cap per request
   if (!urls.length) return res.status(400).json({ error: 'urls[] required' });
+  if (!(await requireQuota(req, res, 'verify_urls', urls.length))) return;
   const results = await Promise.all(urls.map(verifyCreator));
   res.json({ checkedAt: new Date().toISOString(), results });
 });
@@ -171,6 +243,20 @@ app.post('/apify/kol-source', async (req, res) => {
     return res.status(400).json({ error: 'setup with loc and platforms[] is required' });
   }
 
+  // Quota: one sourcing run consumed up front; result count clamped to the
+  // user's remaining KOL allowance so a single run can't drain the Apify budget.
+  const userKey = quotaIdentity(req);
+  let kolCap = maxResults;
+  if (userKey) {
+    if (!(await requireQuota(req, res, 'sourcing_runs', 1))) return;
+    const kolQuota = await peekQuota({
+      userKey, metric: 'kol_results',
+      limit: QUOTAS.kol_results.limit, windowMs: QUOTA_WINDOW_MS,
+    });
+    if (!kolQuota.remaining) return quotaRejection(res, 'kol_results', kolQuota);
+    kolCap = Math.min(Number(maxResults) || 40, kolQuota.remaining);
+  }
+
   const actors = {
     discovery: process.env.APIFY_ACTOR_DISCOVERY || 'alizarin_refrigerator-owner/influencer-discovery---find-influencers-across-social-platforms',
     tiktok: process.env.APIFY_ACTOR_TIKTOK || 'alizarin_refrigerator-owner/tiktok-creator-scraper',
@@ -178,7 +264,15 @@ app.post('/apify/kol-source', async (req, res) => {
   };
 
   try {
-    const out = await sourceKolMultiActor({ token, setup, tiers, backup, maxResults, actors });
+    const out = await sourceKolMultiActor({ token, setup, tiers, backup, maxResults: kolCap, actors });
+    const delivered = (out.shortlist?.length || 0) + (out.backups?.length || 0);
+    let quota = null;
+    if (userKey && delivered) {
+      quota = await consumeQuota({
+        userKey, metric: 'kol_results', amount: delivered,
+        limit: QUOTAS.kol_results.limit, windowMs: QUOTA_WINDOW_MS, force: true,
+      });
+    }
     if (campaignId) {
       await logCampaignAudit({
         campaignId: Number(campaignId),
@@ -194,6 +288,7 @@ app.post('/apify/kol-source', async (req, res) => {
     res.json({
       sourcedAt: new Date().toISOString(),
       ...out,
+      quota: quota ? { kolResults: { used: quota.used, limit: quota.limit, remaining: quota.remaining, resetAt: quota.resetAt } } : null,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -410,6 +505,7 @@ app.post('/ai/generate', async (req, res) => {
   if (!prompt || !system) {
     return res.status(400).json({ error: 'prompt and system are required' });
   }
+  if (!(await requireQuota(req, res, 'ai_calls', 1))) return;
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -471,17 +567,30 @@ app.get('/schedule/summary', (_, res) => {
   });
 });
 
-app.post('/schedule/process-now', async (_, res) => {
+// Real posting to connected brand accounts is super-admin only: in open-access
+// mode anyone can reach the dashboard, but only the true code triggers posts.
+// (scheduler.js is unaffected — it calls the posting functions in-process.)
+function requireSuperCode(req, res) {
+  const code = String(req.headers['x-access-code'] || '').trim();
+  if (code === SUPER_ADMIN_CODE) return true;
+  res.status(403).json({ error: 'Publishing to connected accounts requires the super admin access code. Log in with it via the gate to run posts.' });
+  return false;
+}
+
+app.post('/schedule/process-now', async (req, res) => {
+  if (!requireSuperCode(req, res)) return;
   const result = await processQueuedPosts(new Date());
   res.json({ ...result, runAt: new Date().toISOString() });
 });
 
 // ── Direct post endpoints (used by scheduler.js or manually) ──────────────
 app.post('/post/tiktok', async (req, res) => {
+  if (!requireSuperCode(req, res)) return;
   try { res.json(await postTikTok(req.body)); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/post/meta', async (req, res) => {
+  if (!requireSuperCode(req, res)) return;
   try {
     const { platform } = req.body; // "instagram" | "facebook"
     const fn = platform === 'facebook' ? postFacebook : postInstagram;

@@ -151,6 +151,16 @@ async function initDb() {
     )
   `);
 
+  run(`
+    CREATE TABLE IF NOT EXISTS usage_counters (
+      user_key TEXT NOT NULL,
+      metric TEXT NOT NULL,
+      window_start INTEGER NOT NULL,
+      used INTEGER DEFAULT 0,
+      PRIMARY KEY (user_key, metric)
+    )
+  `);
+
   // Seed the first advertiser so existing DNUVO campaigns stay reachable.
   const advCount = get('SELECT COUNT(*) AS n FROM advertisers');
   if (!advCount || !advCount.n) {
@@ -434,8 +444,58 @@ async function getLatestKpiEntry(campaignId) {
   return row ? { ...row, metrics: computeKpiMetrics(row) } : null;
 }
 
+// ── Usage quotas (per-user cost control for scraping / AI endpoints) ───────
+// Fixed-window counters: each (user_key, metric) pair holds one window.
+// When the window has elapsed the counter resets on next touch.
+
+function readQuotaRow(userKey, metric, windowMs, now) {
+  const row = get(
+    'SELECT window_start AS windowStart, used FROM usage_counters WHERE user_key = ? AND metric = ?',
+    [userKey, metric]
+  );
+  let windowStart = row ? Number(row.windowStart) : now;
+  let used = row ? Number(row.used) : 0;
+  if (!row || now - windowStart >= windowMs) {
+    windowStart = now;
+    used = 0;
+  }
+  return { windowStart, used };
+}
+
+async function peekQuota({ userKey, metric, limit, windowMs }) {
+  const now = Date.now();
+  const { windowStart, used } = readQuotaRow(userKey, metric, windowMs, now);
+  return {
+    used,
+    limit,
+    remaining: Math.max(0, limit - used),
+    resetAt: new Date(windowStart + windowMs).toISOString(),
+  };
+}
+
+// force: record usage even past the limit (used after work already ran),
+// clamping the counter at the limit instead of rejecting.
+async function consumeQuota({ userKey, metric, amount = 1, limit, windowMs, force = false }) {
+  const now = Date.now();
+  const { windowStart, used } = readQuotaRow(userKey, metric, windowMs, now);
+  const resetAt = new Date(windowStart + windowMs).toISOString();
+  if (!force && used + amount > limit) {
+    return { allowed: false, used, limit, remaining: Math.max(0, limit - used), resetAt };
+  }
+  const next = Math.min(limit, used + amount);
+  run(
+    `INSERT INTO usage_counters (user_key, metric, window_start, used) VALUES (?, ?, ?, ?)
+     ON CONFLICT(user_key, metric) DO UPDATE SET window_start = excluded.window_start, used = excluded.used`,
+    [userKey, metric, windowStart, next]
+  );
+  persistDb();
+  return { allowed: true, used: next, limit, remaining: Math.max(0, limit - next), resetAt };
+}
+
 module.exports = {
   initDb,
+  peekQuota,
+  consumeQuota,
   getStorageMode,
   saveAdvertiser,
   listAdvertisers,

@@ -142,6 +142,7 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
   <div class="gate-card">
     <div class="gate-mark"><span>SocialMIND</span></div>
     <div class="gate-sub">Master Network by AKADIGITAL</div>
+    <div id="gate-open-note" class="ib ibg mb" style="margin-bottom:12px"><div class="ibb">Pre-launch open access — taking you straight to the dashboard…</div></div>
     <input id="gate-code" type="password" placeholder="Access code" onkeydown="if(event.key==='Enter')gateLogin()">
     <button class="btn btn-gold" style="width:100%" onclick="gateLogin()">Enter Dashboard →</button>
     <div id="gate-msg"></div>
@@ -161,6 +162,7 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
   <div class="tb-r">
     <div class="adv-pill" id="adv-pill" style="display:none"><span id="adv-pill-name">Advertiser</span><img id="adv-pill-logo" src="" alt="Advertiser logo" style="display:none"></div>
     <div class="tb-pill" id="role-pill" style="display:none"></div>
+    <div class="tb-pill" id="quota-pill" style="display:none" title="Your usage allowance for paid API tools (KOL sourcing, AI, link checks)"></div>
     <div class="tb-pill" style="border-color:rgba(255,199,44,.6);color:#FFE8A8">AI Live</div>
     <div class="tb-pill" id="api-pill">Backend: checking...</div>
     <button class="tb-pill" style="cursor:pointer;background:none" onclick="exportConfig()">⬇ Export setup</button>
@@ -512,10 +514,14 @@ const S = { campaignId:null, campaignName:'', setup:null, creators:null, content
 // AUTH.role: 'superadmin' sees every advertiser + campaign; 'advertiser' is scoped to its own dashboard.
 const AUTH = { code:'', role:null, advertiser:null, advertisers:[], activeAdvertiserId:null };
 
+// Stable per-browser id so usage quotas survive reloads (open-access mode).
+let CID = localStorage.getItem('sm_cid');
+if(!CID){ CID = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2)); localStorage.setItem('sm_cid', CID); }
+
 async function api(path, opts={}){
   const r = await fetch(path, {
     method: opts.method || 'GET',
-    headers: { 'Content-Type': 'application/json', 'x-access-code': AUTH.code || '', ...(opts.headers || {}) },
+    headers: { 'Content-Type': 'application/json', 'x-access-code': AUTH.code || '', 'x-client-id': CID, ...(opts.headers || {}) },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const data = await r.json().catch(() => ({}));
@@ -572,7 +578,20 @@ async function bootDashboard(){
   renderAdvertiserPanel();
   renderAdvertiserPill();
   loadCampaignList();
+  refreshQuotaPill();
   document.getElementById('btn-del-campaign').style.display = AUTH.role === 'superadmin' ? '' : 'none';
+}
+
+async function refreshQuotaPill(){
+  const pill = document.getElementById('quota-pill');
+  try{
+    const q = await api('/quota');
+    if(q.exempt || !q.metrics){ pill.style.display = 'none'; return; }
+    const kol = q.metrics.kol_results, ai = q.metrics.ai_calls;
+    pill.style.display = '';
+    pill.textContent = `Quota · KOL ${kol.remaining}/${kol.limit} · AI ${ai.remaining}/${ai.limit} per ${q.windowHours}h`;
+    if(!kol.remaining || !ai.remaining){ pill.style.borderColor = 'rgba(255,120,90,.7)'; pill.style.color = '#FFC9B8'; }
+  }catch(_){ pill.style.display = 'none'; }
 }
 
 function renderRolePill(){
@@ -1199,6 +1218,7 @@ Keep concise.`);
       `<div class="card"><div class="card-hd">AI Outreach Prioritization (from sourced list)</div>${md(aiBrief)}</div>`+
       `<div class="ib ibg mt"><div class="ibl" style="color:#8A7000">Next action</div><div class="ibb">Copy profile URLs from shortlist and run Creator Link Verification Queue below before final outreach. Only proceed with live profiles.</div></div>`;
     document.getElementById('rn-1').classList.add('done');document.getElementById('rl-1').classList.add('done');
+    refreshQuotaPill();
   }catch(e){
     const isApifyMissing = /APIFY_TOKEN missing/i.test(e.message || '');
     if (isApifyMissing) {
@@ -1716,7 +1736,21 @@ function exportSourcingAllCSV(){
 }
 
 checkBackend();
-tryResumeSession();
+(async () => {
+  if (await tryResumeSession()) return;
+  // Pre-launch open access: try entering without a code. If the backend is
+  // gated (OPEN_ACCESS=false), this fails and the login gate stays visible.
+  try {
+    const data = await api('/auth/login', { method:'POST', body:{ accessCode: '' } });
+    AUTH.code = '';
+    AUTH.role = data.role;
+    AUTH.advertiser = data.advertiser || null;
+    document.getElementById('login-gate').style.display = 'none';
+    await bootDashboard();
+  } catch(_) {
+    document.getElementById('gate-open-note')?.remove();
+  }
+})();
 ['s-budget','s-pct-kol','s-pct-paid','s-pct-prod','s-pct-cont'].forEach((id)=>{
   const el = document.getElementById(id);
   if(el) el.addEventListener('input', renderBriefBudgetEcho);
