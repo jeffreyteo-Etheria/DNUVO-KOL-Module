@@ -18,16 +18,21 @@
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--c1)}::-webkit-scrollbar-thumb{background:var(--c2);border-radius:2px}
 body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-height:100vh;font-size:13px}
 
-.topbar{background:#0F0C08;padding:0 26px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.tb-l{display:flex;align-items:center;gap:10px}
-.gem{width:24px;height:24px;background:linear-gradient(135deg,#B89000,#266040);clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%)}
-.tb-name{font-family:"Playfair Display",serif;font-size:15px;font-weight:700;color:#F5F0E0}
-.tb-name em{color:#D4A800;font-style:italic}
-.tb-sub{font-size:8.5px;text-transform:uppercase;letter-spacing:.18em;color:rgba(245,240,224,.28)}
-.tb-pill{padding:3px 10px;border-radius:20px;font-size:9.5px;font-weight:600;border:1px solid rgba(255,255,255,.1);color:rgba(245,240,224,.45)}
+.topbar{background:linear-gradient(120deg,#0E3425 0%,#146746 56%,#F28A1A 120%);padding:8px 26px;height:78px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 6px 24px rgba(20,44,32,.25)}
+.tb-l{display:flex;align-items:center;gap:12px}
+.gem{width:28px;height:28px;background:linear-gradient(135deg,#2C8E63,#F28A1A);clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);box-shadow:0 0 0 3px rgba(255,255,255,.2)}
+.tb-name{font-family:"Playfair Display",serif;font-size:17px;font-weight:700;color:#FDFBF7;line-height:1.1}
+.tb-name em{color:#FFD17D;font-style:normal;letter-spacing:.04em}
+.tb-sub{font-size:8.3px;text-transform:uppercase;letter-spacing:.18em;color:rgba(244,255,248,.92);margin-top:2px}
+.tb-meta{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,240,218,.88);margin-top:2px}
+.tb-pill{padding:4px 10px;border-radius:20px;font-size:9.5px;font-weight:700;border:1px solid rgba(255,255,255,.35);background:rgba(7,24,17,.22);color:#F4FFF8}
+.tb-r{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.adv-pill{display:flex;align-items:center;gap:8px;padding:4px 9px;border-radius:20px;border:1px solid rgba(255,255,255,.45);background:rgba(255,252,246,.88);color:#163C2D}
+.adv-pill img{height:16px;width:auto;display:block}
+.adv-pill span{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 
 /* PIPELINE RAIL — signature */
-.rail{background:#fff;border-bottom:2px solid var(--bd2);padding:14px 26px 12px;position:sticky;top:56px;z-index:99}
+.rail{background:#fff;border-bottom:2px solid var(--bd2);padding:14px 26px 12px;position:sticky;top:78px;z-index:99}
 .rail-track{max-width:1200px;margin:0 auto;display:flex;align-items:center}
 .rnode{display:flex;flex-direction:column;align-items:center;cursor:pointer;background:none;border:none;font-family:"Inter",sans-serif;min-width:88px}
 .rdot{width:30px;height:30px;border-radius:50%;border:2px solid var(--bd2);background:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ms);transition:all .25s;margin-bottom:5px}
@@ -128,12 +133,14 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
   <div class="tb-l">
     <div class="gem"></div>
     <div>
-      <div class="tb-name"><em>d.nuvo Pipeline</em> — Creators → Content → Post → KPI</div>
-      <div class="tb-sub">AkaDigital · Real data only · No mockups</div>
+      <div class="tb-name"><em>SOCIALMIND</em> · A network by AKADIGITAL</div>
+      <div class="tb-sub">AGENT - SCOUT MANAGEMENT</div>
+      <div class="tb-meta">Creators → Content → Post → KPI</div>
     </div>
   </div>
-  <div style="display:flex;gap:6px">
-    <div class="tb-pill" style="border-color:rgba(184,144,0,.4);color:#D4A800">AI Live</div>
+  <div class="tb-r">
+    <div class="adv-pill"><span>Advertiser: DNUVO</span><img src="assets/dnuvo_logo_black.png" alt="DNUVO logo"></div>
+    <div class="tb-pill" style="border-color:rgba(255,209,125,.6);color:#FFF1D3">AI Live</div>
     <div class="tb-pill" id="api-pill">Backend: checking...</div>
     <button class="tb-pill" style="cursor:pointer;background:none" onclick="exportConfig()">⬇ Export setup</button>
   </div>

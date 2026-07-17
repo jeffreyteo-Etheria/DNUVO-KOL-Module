@@ -1,0 +1,12 @@
+# Local Netlify folder
+.netlify
+
+# Environment secrets — never commit
+.env
+**/.env
+
+# Local data exports
+**/data/exports/
+
+# Editor settings
+.vscode/
