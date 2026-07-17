@@ -996,14 +996,19 @@ async function loadCampaignList(){
   const msg = document.getElementById('campaign-msg');
   try{
     const data = await api('/campaigns');
-    const items = data.items || [];
-    const label = (c) => AUTH.role === 'superadmin'
-      ? `[${c.advertiserBrand || 'Unassigned'}] #${c.id} · ${c.name} · ${new Date(c.updatedAt).toLocaleString()}`
-      : `#${c.id} · ${c.name} · ${new Date(c.updatedAt).toLocaleString()}`;
+    let items = data.items || [];
+    // Super admin sees the campaign set of the advertiser being worked under;
+    // switch context in Advertiser Input to see another advertiser's set.
+    const ctxAdv = AUTH.role === 'superadmin' ? activeAdvertiser() : AUTH.advertiser;
+    if(AUTH.role === 'superadmin' && ctxAdv){
+      items = items.filter(c => c.advertiserId === ctxAdv.id);
+    }
+    const label = (c) => `#${c.id} · ${c.name} · ${new Date(c.updatedAt).toLocaleString()}`;
     sel.innerHTML = '<option value="">Select campaign...</option>' +
       items.map(c => `<option value="${c.id}">${label(c)}</option>`).join('');
-    const scopeNote = AUTH.role === 'superadmin' ? 'across all advertisers' : `for ${AUTH.advertiser?.brand || 'your advertiser'}`;
-    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Campaign list refreshed</div><div class="ibb">${items.length} campaign snapshot(s) in the repository ${scopeNote}.</div></div>`;
+    const scopeNote = ctxAdv ? `filed under ${ctxAdv.brand}` : 'across all advertisers';
+    const switchHint = AUTH.role === 'superadmin' ? ' Use "Work under" in Advertiser Input to view another advertiser\'s campaign set.' : '';
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Campaign list refreshed</div><div class="ibb">${items.length} campaign snapshot(s) ${scopeNote}.${switchHint}</div></div>`;
   }catch(e){
     msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Unable to load campaigns</div><div class="ibb">${e.message}</div></div>`;
   }
