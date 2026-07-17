@@ -18,6 +18,21 @@
   status = 200
 
 [[redirects]]
+  from = "/auth/*"
+  to = "/.netlify/functions/api/auth/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/advertisers"
+  to = "/.netlify/functions/api/advertisers"
+  status = 200
+
+[[redirects]]
+  from = "/advertisers/*"
+  to = "/.netlify/functions/api/advertisers/:splat"
+  status = 200
+
+[[redirects]]
   from = "/campaigns"
   to = "/.netlify/functions/api/campaigns"
   status = 200

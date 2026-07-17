@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const initSqlJs = require('sql.js');
 
 const isServerless = Boolean(process.env.NETLIFY) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -11,11 +12,32 @@ const dataDir = isServerless
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const dbPath = path.join(dataDir, 'pipeline.db');
+const BLOB_KEY = 'pipeline.db';
 let db;
+let storageMode = 'file';
+let blobWriteChain = Promise.resolve();
+
+function getBlobStore() {
+  if (!isServerless) return null;
+  try {
+    const { getStore } = require('@netlify/blobs');
+    return getStore({ name: 'socialmind-db', consistency: 'strong' });
+  } catch (_) {
+    return null;
+  }
+}
 
 function persistDb() {
   const bytes = db.export();
   fs.writeFileSync(dbPath, Buffer.from(bytes));
+  const store = getBlobStore();
+  if (store) {
+    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    blobWriteChain = blobWriteChain
+      .then(() => store.set(BLOB_KEY, buf))
+      .then(() => { storageMode = 'netlify-blobs'; })
+      .catch((e) => console.error('Blob persist failed:', e.message));
+  }
 }
 
 function run(sql, params = []) {
@@ -43,18 +65,48 @@ function all(sql, params = []) {
   return rows;
 }
 
+async function loadDbBytes() {
+  const store = getBlobStore();
+  if (store) {
+    try {
+      const buf = await store.get(BLOB_KEY, { type: 'arrayBuffer' });
+      if (buf && buf.byteLength) {
+        storageMode = 'netlify-blobs';
+        return new Uint8Array(buf);
+      }
+      storageMode = 'netlify-blobs';
+    } catch (e) {
+      console.error('Blob load failed, falling back to file:', e.message);
+    }
+  }
+  if (fs.existsSync(dbPath)) return fs.readFileSync(dbPath);
+  return null;
+}
+
+function getStorageMode() {
+  return storageMode;
+}
+
 async function initDb() {
   const SQL = await initSqlJs({});
-  if (fs.existsSync(dbPath)) {
-    const filebuffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(filebuffer);
-  } else {
-    db = new SQL.Database();
-  }
+  const bytes = await loadDbBytes();
+  db = bytes ? new SQL.Database(bytes) : new SQL.Database();
 
+  run(`
+    CREATE TABLE IF NOT EXISTS advertisers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company TEXT NOT NULL,
+      brand TEXT NOT NULL,
+      logo_data TEXT,
+      access_code TEXT UNIQUE,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
   run(`
     CREATE TABLE IF NOT EXISTS campaigns (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      advertiser_id INTEGER,
       name TEXT NOT NULL,
       status TEXT DEFAULT 'draft',
       setup_json TEXT,
@@ -67,6 +119,8 @@ async function initDb() {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // Migration for databases created before the advertiser layer existed.
+  try { run('ALTER TABLE campaigns ADD COLUMN advertiser_id INTEGER'); } catch (_) {}
   run(`
     CREATE TABLE IF NOT EXISTS campaign_kpi_entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,12 +147,82 @@ async function initDb() {
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
     )
   `);
+
+  // Seed the first advertiser so existing DNUVO campaigns stay reachable.
+  const advCount = get('SELECT COUNT(*) AS n FROM advertisers');
+  if (!advCount || !advCount.n) {
+    run(
+      `INSERT INTO advertisers (company, brand, logo_data, access_code) VALUES (?, ?, ?, ?)`,
+      ['Etheria Group', 'DNUVO', 'assets/dnuvo_logo_black.png', process.env.DNUVO_ACCESS_CODE || 'DNUVO-2026']
+    );
+    const seeded = get('SELECT last_insert_rowid() AS id');
+    run('UPDATE campaigns SET advertiser_id = ? WHERE advertiser_id IS NULL', [seeded.id]);
+  }
+
   persistDb();
+}
+
+function generateAccessCode() {
+  return 'SM-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+function mapAdvertiser(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    company: r.company,
+    brand: r.brand,
+    logo: r.logo_data || null,
+    accessCode: r.access_code,
+    createdAt: r.createdAt || r.created_at,
+    updatedAt: r.updatedAt || r.updated_at,
+  };
+}
+
+async function saveAdvertiser({ id, company, brand, logo }) {
+  if (id) {
+    run(
+      `UPDATE advertisers SET company = ?, brand = ?, logo_data = COALESCE(?, logo_data), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [company, brand, logo || null, id]
+    );
+    persistDb();
+    return Number(id);
+  }
+  const created = run(
+    `INSERT INTO advertisers (company, brand, logo_data, access_code) VALUES (?, ?, ?, ?)`,
+    [company, brand, logo || null, generateAccessCode()]
+  );
+  persistDb();
+  return created.lastID;
+}
+
+async function listAdvertisers() {
+  return all(
+    `SELECT id, company, brand, logo_data, access_code, created_at AS createdAt, updated_at AS updatedAt
+     FROM advertisers ORDER BY company COLLATE NOCASE`
+  ).map(mapAdvertiser);
+}
+
+async function getAdvertiser(id) {
+  return mapAdvertiser(get(
+    `SELECT id, company, brand, logo_data, access_code, created_at AS createdAt, updated_at AS updatedAt
+     FROM advertisers WHERE id = ?`,
+    [id]
+  ));
+}
+
+async function getAdvertiserByCode(code) {
+  return mapAdvertiser(get(
+    `SELECT id, company, brand, logo_data, access_code, created_at AS createdAt, updated_at AS updatedAt
+     FROM advertisers WHERE access_code = ?`,
+    [code]
+  ));
 }
 
 async function saveCampaign(payload) {
   const {
     id,
+    advertiserId,
     name,
     status = 'draft',
     setup,
@@ -144,9 +268,10 @@ async function saveCampaign(payload) {
 
   const created = run(
     `INSERT INTO campaigns
-      (name, status, setup_json, creators_text, content_json, budget_json, schedule_json, verifications_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      (advertiser_id, name, status, setup_json, creators_text, content_json, budget_json, schedule_json, verifications_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
+      advertiserId || null,
       row.name,
       row.status,
       row.setup_json,
@@ -161,17 +286,25 @@ async function saveCampaign(payload) {
   return created.lastID;
 }
 
-async function listCampaigns() {
+async function listCampaigns(advertiserId = null) {
+  const where = advertiserId ? 'WHERE c.advertiser_id = ?' : '';
+  const params = advertiserId ? [advertiserId] : [];
   return all(
-    `SELECT id, name, status, created_at AS createdAt, updated_at AS updatedAt
-     FROM campaigns
-     ORDER BY updated_at DESC`
+    `SELECT c.id, c.advertiser_id AS advertiserId, c.name, c.status,
+            c.created_at AS createdAt, c.updated_at AS updatedAt,
+            a.brand AS advertiserBrand, a.company AS advertiserCompany
+     FROM campaigns c
+     LEFT JOIN advertisers a ON a.id = c.advertiser_id
+     ${where}
+     ORDER BY c.updated_at DESC`,
+    params
   );
 }
 
 async function getCampaign(id) {
   const c = await get(
-    `SELECT id, name, status, setup_json, creators_text, content_json, budget_json, schedule_json, verifications_json,
+    `SELECT id, advertiser_id AS advertiserId, name, status, setup_json, creators_text, content_json,
+            budget_json, schedule_json, verifications_json,
             created_at AS createdAt, updated_at AS updatedAt
      FROM campaigns
      WHERE id = ?`,
@@ -180,6 +313,7 @@ async function getCampaign(id) {
   if (!c) return null;
   return {
     id: c.id,
+    advertiserId: c.advertiserId || null,
     name: c.name,
     status: c.status,
     createdAt: c.createdAt,
@@ -193,6 +327,14 @@ async function getCampaign(id) {
       verifications: c.verifications_json ? JSON.parse(c.verifications_json) : [],
     },
   };
+}
+
+async function deleteCampaign(id) {
+  run('DELETE FROM campaign_kpi_entries WHERE campaign_id = ?', [id]);
+  run('DELETE FROM campaign_audit_logs WHERE campaign_id = ?', [id]);
+  const res = run('DELETE FROM campaigns WHERE id = ?', [id]);
+  persistDb();
+  return res.changes > 0;
 }
 
 async function logCampaignAudit({ campaignId, action, actor = 'dashboard', details = {} }) {
@@ -281,9 +423,15 @@ async function getLatestKpiEntry(campaignId) {
 
 module.exports = {
   initDb,
+  getStorageMode,
+  saveAdvertiser,
+  listAdvertisers,
+  getAdvertiser,
+  getAdvertiserByCode,
   saveCampaign,
   listCampaigns,
   getCampaign,
+  deleteCampaign,
   logCampaignAudit,
   listCampaignAudit,
   saveKpiEntry,

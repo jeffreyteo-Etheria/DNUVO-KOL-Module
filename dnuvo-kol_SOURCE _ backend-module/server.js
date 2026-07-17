@@ -11,9 +11,15 @@ const { postInstagram, postFacebook } = require('./src/postMeta');
 const { sourceKolMultiActor } = require('./src/apifySource');
 const {
   initDb,
+  getStorageMode,
+  saveAdvertiser,
+  listAdvertisers,
+  getAdvertiser,
+  getAdvertiserByCode,
   saveCampaign,
   listCampaigns,
   getCampaign,
+  deleteCampaign,
   logCampaignAudit,
   listCampaignAudit,
   saveKpiEntry,
@@ -22,7 +28,7 @@ const {
 } = require('./src/db');
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '4mb' }));
 app.use(express.static(path.join(__dirname, 'public'))); // dashboard at http://localhost:3000
 const isServerless = Boolean(process.env.NETLIFY) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
 const runtimeDataDir = isServerless ? path.join(os.tmpdir(), 'dnuvo-data') : path.join(__dirname, 'data');
@@ -30,6 +36,57 @@ if (!fs.existsSync(runtimeDataDir)) fs.mkdirSync(runtimeDataDir, { recursive: tr
 const SCHEDULE_FILE = path.join(runtimeDataDir, 'schedule.json');
 const load = () => fs.existsSync(SCHEDULE_FILE) ? JSON.parse(fs.readFileSync(SCHEDULE_FILE)) : [];
 const save = (d) => fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(d, null, 2));
+
+// ── Access control ─────────────────────────────────────────────────────────
+// Super admin sees every advertiser and campaign; an advertiser access code
+// scopes all campaign data to that advertiser only.
+const SUPER_ADMIN_CODE = process.env.SUPER_ADMIN_CODE || 'SOCIALMIND-MASTER';
+
+async function resolveAccess(req) {
+  const code = String(req.headers['x-access-code'] || '').trim();
+  if (!code) return null;
+  if (code === SUPER_ADMIN_CODE) return { role: 'superadmin', advertiser: null };
+  const advertiser = await getAdvertiserByCode(code);
+  if (advertiser) return { role: 'advertiser', advertiser };
+  return null;
+}
+
+async function requireAccess(req, res) {
+  const access = await resolveAccess(req);
+  if (!access) {
+    res.status(401).json({ error: 'Access code required. Log in as super admin or advertiser.' });
+    return null;
+  }
+  return access;
+}
+
+async function requireCampaignAccess(req, res, campaignId) {
+  const access = await requireAccess(req, res);
+  if (!access) return null;
+  const campaign = await getCampaign(campaignId);
+  if (!campaign) {
+    res.status(404).json({ error: 'Campaign not found' });
+    return null;
+  }
+  if (access.role !== 'superadmin' && campaign.advertiserId !== access.advertiser.id) {
+    res.status(403).json({ error: 'This campaign belongs to another advertiser.' });
+    return null;
+  }
+  return { access, campaign };
+}
+
+app.post('/auth/login', async (req, res) => {
+  try {
+    const code = String((req.body || {}).accessCode || '').trim();
+    if (!code) return res.status(400).json({ error: 'accessCode required' });
+    if (code === SUPER_ADMIN_CODE) return res.json({ role: 'superadmin', advertiser: null });
+    const advertiser = await getAdvertiserByCode(code);
+    if (advertiser) return res.json({ role: 'advertiser', advertiser });
+    res.status(401).json({ error: 'Invalid access code' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get('/health', async (_, res) => {
   let dbOk = false;
@@ -46,6 +103,7 @@ app.get('/health', async (_, res) => {
     services: {
       backend: true,
       database: dbOk,
+      storage: getStorageMode(),
       anthropicConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
       apifyConfigured: Boolean(process.env.APIFY_TOKEN),
       tiktokConfigured: Boolean(process.env.TIKTOK_ACCESS_TOKEN),
@@ -141,10 +199,51 @@ app.post('/apify/kol-source', async (req, res) => {
   }
 });
 
-// ── Campaign persistence (SQLite) ──────────────────────────────────────────
-app.get('/campaigns', async (_, res) => {
+// ── Advertisers (master network layer) ─────────────────────────────────────
+app.get('/advertisers', async (req, res) => {
   try {
-    res.json({ items: await listCampaigns() });
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    if (access.role === 'superadmin') return res.json({ items: await listAdvertisers() });
+    res.json({ items: [access.advertiser] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/advertisers', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const { id, company, brand, logo } = req.body || {};
+    if (!company || !brand) return res.status(400).json({ error: 'company and brand are required' });
+
+    if (id) {
+      // Only super admin may amend other advertisers; an advertiser may update its own profile.
+      if (access.role !== 'superadmin' && access.advertiser.id !== Number(id)) {
+        return res.status(403).json({ error: 'Only super admin can amend other advertisers.' });
+      }
+      await saveAdvertiser({ id: Number(id), company, brand, logo });
+      return res.json({ saved: true, advertiser: await getAdvertiser(Number(id)) });
+    }
+
+    if (access.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only super admin can create new advertisers.' });
+    }
+    const newId = await saveAdvertiser({ company, brand, logo });
+    res.json({ saved: true, advertiser: await getAdvertiser(newId) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Campaign persistence (scoped by advertiser access) ─────────────────────
+app.get('/campaigns', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const scope = access.role === 'superadmin' ? null : access.advertiser.id;
+    res.json({ items: await listCampaigns(scope), role: access.role });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -152,9 +251,26 @@ app.get('/campaigns', async (_, res) => {
 
 app.get('/campaigns/:id', async (req, res) => {
   try {
-    const item = await getCampaign(Number(req.params.id));
-    if (!item) return res.status(404).json({ error: 'Campaign not found' });
-    res.json(item);
+    const ctx = await requireCampaignAccess(req, res, Number(req.params.id));
+    if (!ctx) return;
+    res.json(ctx.campaign);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/campaigns/:id', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    if (access.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only super admin can delete campaigns. Campaigns remain in the repository until super admin deletion.' });
+    }
+    const id = Number(req.params.id);
+    const campaign = await getCampaign(id);
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    const deleted = await deleteCampaign(id);
+    res.json({ deleted, id, name: campaign.name });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -163,8 +279,8 @@ app.get('/campaigns/:id', async (req, res) => {
 app.get('/campaigns/:id/audit', async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
-    const campaign = await getCampaign(campaignId);
-    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    const ctx = await requireCampaignAccess(req, res, campaignId);
+    if (!ctx) return;
     const limit = Math.max(1, Math.min(Number(req.query.limit) || 50, 200));
     const items = await listCampaignAudit(campaignId, limit);
     res.json({ campaignId, items });
@@ -176,8 +292,8 @@ app.get('/campaigns/:id/audit', async (req, res) => {
 app.post('/campaigns/:id/kpi', async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
-    const campaign = await getCampaign(campaignId);
-    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    const ctx = await requireCampaignAccess(req, res, campaignId);
+    if (!ctx) return;
     const { spend = 0, revenue = 0, orders = 0, leads = 0, views = 0, clicks = 0, notes = '' } = req.body || {};
     const id = await saveKpiEntry({ campaignId, spend, revenue, orders, leads, views, clicks, notes });
     const latest = await getLatestKpiEntry(campaignId);
@@ -195,8 +311,8 @@ app.post('/campaigns/:id/kpi', async (req, res) => {
 app.get('/campaigns/:id/kpi', async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
-    const campaign = await getCampaign(campaignId);
-    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    const ctx = await requireCampaignAccess(req, res, campaignId);
+    if (!ctx) return;
     const limit = Math.max(1, Math.min(Number(req.query.limit) || 30, 200));
     const latest = await getLatestKpiEntry(campaignId);
     const history = await listKpiEntries(campaignId, limit);
@@ -208,12 +324,35 @@ app.get('/campaigns/:id/kpi', async (req, res) => {
 
 app.post('/campaigns/save', async (req, res) => {
   try {
-    const { id, name, status, snapshot } = req.body || {};
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const { id, name, status, snapshot, advertiserId } = req.body || {};
     if (!snapshot || !snapshot.setup) {
       return res.status(400).json({ error: 'snapshot.setup is required' });
     }
+
+    // Every campaign is filed under an advertiser in the repository.
+    let ownerAdvertiserId;
+    if (access.role === 'superadmin') {
+      ownerAdvertiserId = Number(advertiserId) || null;
+      if (!id && !ownerAdvertiserId) {
+        return res.status(400).json({ error: 'Super admin must select an advertiser before saving a new campaign.' });
+      }
+    } else {
+      ownerAdvertiserId = access.advertiser.id;
+    }
+
+    if (id) {
+      const existing = await getCampaign(Number(id));
+      if (!existing) return res.status(404).json({ error: 'Campaign not found' });
+      if (access.role !== 'superadmin' && existing.advertiserId !== access.advertiser.id) {
+        return res.status(403).json({ error: 'Only super admin can amend campaigns of another advertiser.' });
+      }
+    }
+
     const campaignId = await saveCampaign({
       id,
+      advertiserId: ownerAdvertiserId,
       name,
       status,
       setup: snapshot.setup,
@@ -226,6 +365,7 @@ app.post('/campaigns/save', async (req, res) => {
     await logCampaignAudit({
       campaignId,
       action: id ? 'campaign_updated' : 'campaign_created',
+      actor: access.role === 'superadmin' ? 'superadmin' : `advertiser:${access.advertiser.brand}`,
       details: {
         name,
         status,
