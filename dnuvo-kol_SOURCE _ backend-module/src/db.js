@@ -1,8 +1,13 @@
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const initSqlJs = require('sql.js');
 
-const dataDir = path.join(__dirname, '..', 'data');
+const isServerless = Boolean(process.env.NETLIFY) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+const dataDir = isServerless
+  ? path.join(os.tmpdir(), 'dnuvo-data')
+  : path.join(__dirname, '..', 'data');
+
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const dbPath = path.join(dataDir, 'pipeline.db');

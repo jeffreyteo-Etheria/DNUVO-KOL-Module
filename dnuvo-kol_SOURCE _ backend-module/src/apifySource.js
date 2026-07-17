@@ -188,11 +188,13 @@ function mergeByHandle(base, enrich, sourceLabel) {
 }
 
 async function sourceKolMultiActor({ token, setup, tiers = {}, backup = 5, maxResults = 40, actors = {} }) {
-  const platforms = (setup?.platforms || []).filter((p) => ['TikTok', 'Instagram'].includes(p));
+  const platforms = (setup?.platforms || [])
+    .map((p) => String(p || '').toLowerCase())
+    .filter((p) => ['tiktok', 'instagram'].includes(p));
   const tiersRequested = tiers || {};
 
   const discoveryInput = {
-    platforms: platforms.length ? platforms : ['TikTok', 'Instagram'],
+    platforms: platforms.length ? platforms : ['tiktok', 'instagram'],
     niches: ['skincare', 'k-beauty', 'sensitive skin', 'beauty'],
     keywords: ['ceramide', 'milia', 'ampoule', 'skin barrier'],
     locations: [setup?.loc || 'Singapore'],
@@ -200,8 +202,8 @@ async function sourceKolMultiActor({ token, setup, tiers = {}, backup = 5, maxRe
     minEngagementRate: 2,
     includeContactInfo: true,
     maxResults,
-    languagePreference: 'English',
-    sortBy: 'engagement',
+    languagePreference: 'en',
+    sortBy: 'engagementRate',
   };
 
   const used = [];

@@ -4,6 +4,7 @@ require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { verifyCreator } = require('./src/verifyCreator');
 const { postTikTok } = require('./src/postTikTok');
 const { postInstagram, postFacebook } = require('./src/postMeta');
@@ -23,7 +24,10 @@ const {
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public'))); // dashboard at http://localhost:3000
-const SCHEDULE_FILE = path.join(__dirname, 'data', 'schedule.json');
+const isServerless = Boolean(process.env.NETLIFY) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+const runtimeDataDir = isServerless ? path.join(os.tmpdir(), 'dnuvo-data') : path.join(__dirname, 'data');
+if (!fs.existsSync(runtimeDataDir)) fs.mkdirSync(runtimeDataDir, { recursive: true });
+const SCHEDULE_FILE = path.join(runtimeDataDir, 'schedule.json');
 const load = () => fs.existsSync(SCHEDULE_FILE) ? JSON.parse(fs.readFileSync(SCHEDULE_FILE)) : [];
 const save = (d) => fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(d, null, 2));
 
