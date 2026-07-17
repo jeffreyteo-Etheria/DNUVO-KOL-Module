@@ -658,7 +658,12 @@ function setActiveAdvertiser(id){
   AUTH.activeAdvertiserId = id;
   renderAdvertiserPanel();
   renderAdvertiserPill();
+  // Each advertiser has its own campaign set — switching context starts clean.
+  resetWorkspaceState();
   loadCampaignList();
+  const adv = activeAdvertiser();
+  const msg = document.getElementById('adv-msg');
+  if(msg && adv) msg.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Now working under ${adv.brand}</div><div class="ibb">Workspace reset to a fresh campaign set. Everything you set up and save is filed under ${adv.brand} in the repository.</div></div>`;
 }
 
 function readLogoFile(){
@@ -704,10 +709,15 @@ async function saveAdvertiserProfile(){
     if(!isUpdate && data.advertiser) AUTH.activeAdvertiserId = data.advertiser.id;
     renderAdvertiserPanel();
     renderAdvertiserPill();
+    if(!isUpdate){
+      // New advertiser = entire new campaign set: open a clean workspace under it.
+      resetWorkspaceState();
+      loadCampaignList();
+    }
     const el = document.getElementById('adv-msg');
     el.innerHTML = isUpdate
       ? `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Advertiser profile saved</div><div class="ibb">${brand} updated. Logo now shows in the top-right advertiser menu.</div></div>`
-      : `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Advertiser created</div><div class="ibb">${brand} registered under SocialMIND. Advertiser access code: <strong style="font-family:'JetBrains Mono',monospace">${data.advertiser.accessCode}</strong> — share this for their scoped login.</div></div>`;
+      : `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Advertiser created — new campaign set opened</div><div class="ibb">${brand} registered under SocialMIND and set as the active context: the workspace below is a fresh campaign set filed under ${brand}. Only super admin and this advertiser's own code can view or edit its campaigns.<br>Advertiser access code: <strong style="font-family:'JetBrains Mono',monospace">${data.advertiser.accessCode}</strong> — share this for their scoped login.</div></div>`;
   }catch(e){
     msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Save failed</div><div class="ibb">${e.message}</div></div>`;
   }
@@ -810,6 +820,54 @@ function unlockAll(){
   for(let i=1;i<5;i++){ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=''; }
   document.getElementById('rn-0').classList.add('done');
   document.getElementById('rl-0').classList.add('done');
+}
+
+function relockPipeline(){
+  unlocked=[true,false,false,false,false];
+  for(let i=0;i<5;i++){
+    const node=document.getElementById('rn-'+i);
+    node.classList.remove('done');
+    node.classList.toggle('on', i===0);
+  }
+  for(let i=0;i<4;i++){ const rl=document.getElementById('rl-'+i); if(rl) rl.classList.remove('done'); }
+  const locks={1:'🔒 setup first',2:'🔒',3:'🔒',4:'🔒'};
+  Object.keys(locks).forEach((i)=>{ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=locks[i]; });
+}
+
+// Fresh campaign set for a new advertiser context — clears every pipeline
+// input/output so nothing leaks from the previously loaded advertiser.
+function resetWorkspaceState(){
+  S.campaignId=null; S.campaignName=''; S.setup=null; S.creators=null; S.content=[]; S.schedule=[];
+  S.budget=null; S.verifications=[]; S.manualCreators=[]; S.kpiLatest=null; S.kpiHistory=[]; S.sourcingData=null;
+  ['campaign-name','s-audience','s-kol-personas','s-content-brief','s-guardrails','s-budget','s-brand-url',
+   's-location','s-competitors','s-handles','s-skus','s-date-start','s-date-end','c-footage','v-urls',
+   'm-name','m-handle','m-url','m-followers','m-notes',
+   'k-spend','k-rev','k-orders','k-leads','k-views','k-clicks'].forEach((id)=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('s-local-floor').value=70;
+  document.getElementById('s-pct-kol').value=45;
+  document.getElementById('s-pct-paid').value=30;
+  document.getElementById('s-pct-prod').value=15;
+  document.getElementById('s-pct-cont').value=10;
+  ['t-nano','t-micro','t-mid','t-macro','t-mega'].forEach((id)=>{ document.getElementById(id).value=0; });
+  document.getElementById('t-backup').value=5;
+  document.querySelectorAll('.s-plat').forEach((c)=>{ c.checked=['TikTok','Instagram','Shopee','Shopify'].includes(c.value); });
+  document.querySelectorAll('.s-period').forEach((c)=>{ c.checked=c.value==='BAU'; });
+  document.getElementById('c-sku').innerHTML='';
+  ['creators-output','content-output','schedule-output','queue-output','verify-output','rec-output',
+   'kpi-output','kpi-history','audit-output','setup-msg','manual-kol-msg','kpi-msg','connection-msg'].forEach((id)=>{
+    const el=document.getElementById(id); if(el) el.innerHTML='';
+  });
+  const bv=document.getElementById('budget-view');
+  if(bv) bv.outerHTML=`<div id="budget-view" class="empty"><h4>No budget allocated yet</h4><p>Complete Setup and Section 1 (creator counts), then generate the split below.</p></div>`;
+  document.getElementById('rec-inputs-echo').innerHTML='Complete Setup to see your inputs here.';
+  document.getElementById('floor-echo').textContent='70';
+  renderManualCreatorList();
+  renderBriefBudgetEcho();
+  renderBriefQuality();
+  relockPipeline();
+  goStep(0);
 }
 
 function renderBriefBudgetEcho(){
