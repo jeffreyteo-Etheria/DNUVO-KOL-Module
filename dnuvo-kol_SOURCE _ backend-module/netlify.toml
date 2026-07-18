@@ -43,6 +43,16 @@
   status = 200
 
 [[redirects]]
+  from = "/creator-sources"
+  to = "/.netlify/functions/api/creator-sources"
+  status = 200
+
+[[redirects]]
+  from = "/creator-sources/*"
+  to = "/.netlify/functions/api/creator-sources/:splat"
+  status = 200
+
+[[redirects]]
   from = "/ai/*"
   to = "/.netlify/functions/api/ai/:splat"
   status = 200
