@@ -118,12 +118,16 @@ async function initDb() {
       budget_json TEXT,
       schedule_json TEXT,
       verifications_json TEXT,
+      manual_creators_json TEXT,
+      pricing_json TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  // Migration for databases created before the advertiser layer existed.
+  // Migrations for databases created before these columns existed.
   try { run('ALTER TABLE campaigns ADD COLUMN advertiser_id INTEGER'); } catch (_) {}
+  try { run('ALTER TABLE campaigns ADD COLUMN manual_creators_json TEXT'); } catch (_) {}
+  try { run('ALTER TABLE campaigns ADD COLUMN pricing_json TEXT'); } catch (_) {}
   run(`
     CREATE TABLE IF NOT EXISTS campaign_kpi_entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,6 +154,31 @@ async function initDb() {
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
     )
   `);
+
+  // Accumulative, cross-campaign creator library. A creator saved here from any
+  // campaign stays available for every future campaign under the same advertiser.
+  run(`
+    CREATE TABLE IF NOT EXISTS creator_sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      advertiser_id INTEGER,
+      name TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      handle TEXT,
+      profile_url TEXT NOT NULL,
+      followers INTEGER DEFAULT 0,
+      tier TEXT,
+      rate_note TEXT,
+      niche TEXT,
+      notes TEXT,
+      source TEXT DEFAULT 'manual',
+      verify_status TEXT DEFAULT 'unverified',
+      verify_http INTEGER,
+      verified_at TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  try { run('CREATE UNIQUE INDEX IF NOT EXISTS idx_creator_sources_adv_url ON creator_sources(advertiser_id, profile_url)'); } catch (_) {}
 
   run(`
     CREATE TABLE IF NOT EXISTS api_tokens (
@@ -258,6 +287,8 @@ async function saveCampaign(payload) {
     budget,
     schedule,
     verifications,
+    manualCreators,
+    pricing,
   } = payload;
 
   const row = {
@@ -269,13 +300,16 @@ async function saveCampaign(payload) {
     budget_json: JSON.stringify(budget || null),
     schedule_json: JSON.stringify(schedule || []),
     verifications_json: JSON.stringify(verifications || []),
+    manual_creators_json: JSON.stringify(manualCreators || []),
+    pricing_json: JSON.stringify(pricing || null),
   };
 
   if (id) {
     run(
       `UPDATE campaigns
        SET name = ?, status = ?, setup_json = ?, creators_text = ?, content_json = ?,
-           budget_json = ?, schedule_json = ?, verifications_json = ?, updated_at = CURRENT_TIMESTAMP
+           budget_json = ?, schedule_json = ?, verifications_json = ?, manual_creators_json = ?,
+           pricing_json = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [
         row.name,
@@ -286,6 +320,8 @@ async function saveCampaign(payload) {
         row.budget_json,
         row.schedule_json,
         row.verifications_json,
+        row.manual_creators_json,
+        row.pricing_json,
         id,
       ]
     );
@@ -295,8 +331,8 @@ async function saveCampaign(payload) {
 
   const created = run(
     `INSERT INTO campaigns
-      (advertiser_id, name, status, setup_json, creators_text, content_json, budget_json, schedule_json, verifications_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (advertiser_id, name, status, setup_json, creators_text, content_json, budget_json, schedule_json, verifications_json, manual_creators_json, pricing_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       advertiserId || null,
       row.name,
@@ -307,6 +343,8 @@ async function saveCampaign(payload) {
       row.budget_json,
       row.schedule_json,
       row.verifications_json,
+      row.manual_creators_json,
+      row.pricing_json,
     ]
   );
   persistDb();
@@ -331,7 +369,7 @@ async function listCampaigns(advertiserId = null) {
 async function getCampaign(id) {
   const c = await get(
     `SELECT id, advertiser_id AS advertiserId, name, status, setup_json, creators_text, content_json,
-            budget_json, schedule_json, verifications_json,
+            budget_json, schedule_json, verifications_json, manual_creators_json, pricing_json,
             created_at AS createdAt, updated_at AS updatedAt
      FROM campaigns
      WHERE id = ?`,
@@ -352,6 +390,8 @@ async function getCampaign(id) {
       budget: c.budget_json ? JSON.parse(c.budget_json) : null,
       schedule: c.schedule_json ? JSON.parse(c.schedule_json) : [],
       verifications: c.verifications_json ? JSON.parse(c.verifications_json) : [],
+      manualCreators: c.manual_creators_json ? JSON.parse(c.manual_creators_json) : [],
+      pricing: c.pricing_json ? JSON.parse(c.pricing_json) : null,
     },
   };
 }
@@ -456,6 +496,111 @@ async function getLatestKpiEntry(campaignId) {
     [campaignId]
   );
   return row ? { ...row, metrics: computeKpiMetrics(row) } : null;
+}
+
+// ── Creator sources (accumulative cross-campaign creator library) ──────────
+function mapCreatorSource(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    advertiserId: r.advertiserId || null,
+    name: r.name,
+    platform: r.platform,
+    handle: r.handle || '',
+    profileUrl: r.profileUrl,
+    followers: Number(r.followers || 0),
+    tier: r.tier || '',
+    rateNote: r.rateNote || '',
+    niche: r.niche || '',
+    notes: r.notes || '',
+    source: r.source || 'manual',
+    verifyStatus: r.verifyStatus || 'unverified',
+    verifyHttp: r.verifyHttp ?? null,
+    verifiedAt: r.verifiedAt || null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+const CREATOR_SOURCE_COLUMNS = `id, advertiser_id AS advertiserId, name, platform, handle, profile_url AS profileUrl,
+  followers, tier, rate_note AS rateNote, niche, notes, source, verify_status AS verifyStatus,
+  verify_http AS verifyHttp, verified_at AS verifiedAt, created_at AS createdAt, updated_at AS updatedAt`;
+
+async function saveCreatorSource(payload) {
+  const {
+    id, advertiserId, name, platform, handle, profileUrl,
+    followers = 0, tier = '', rateNote = '', niche = '', notes = '', source = 'manual',
+  } = payload;
+  if (!name || !platform || !profileUrl) {
+    throw new Error('name, platform, and profileUrl are required');
+  }
+  if (id) {
+    run(
+      `UPDATE creator_sources
+       SET name = ?, platform = ?, handle = ?, profile_url = ?, followers = ?, tier = ?,
+           rate_note = ?, niche = ?, notes = ?, source = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [name, platform, handle || '', profileUrl, followers, tier, rateNote, niche, notes, source, id]
+    );
+    persistDb();
+    return Number(id);
+  }
+  // Upsert on (advertiser_id, profile_url) so re-saving the same creator from a
+  // different campaign updates the one library row instead of duplicating it.
+  // SQLite treats every NULL as distinct from every other NULL, so a NULL
+  // advertiser_id would defeat this unique constraint entirely — use 0 as an
+  // explicit "no advertiser" sentinel instead (mapCreatorSource maps it back
+  // to null on read; real advertiser ids are always >= 1 via AUTOINCREMENT).
+  const advKey = advertiserId || 0;
+  run(
+    `INSERT INTO creator_sources
+      (advertiser_id, name, platform, handle, profile_url, followers, tier, rate_note, niche, notes, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(advertiser_id, profile_url) DO UPDATE SET
+       name = excluded.name, platform = excluded.platform, handle = excluded.handle,
+       followers = excluded.followers, tier = excluded.tier, rate_note = excluded.rate_note,
+       niche = excluded.niche, notes = excluded.notes, source = excluded.source,
+       updated_at = CURRENT_TIMESTAMP`,
+    [advKey, name, platform, handle || '', profileUrl, followers, tier, rateNote, niche, notes, source]
+  );
+  persistDb();
+  const row = get(
+    `SELECT id FROM creator_sources WHERE profile_url = ? AND advertiser_id = ?`,
+    [profileUrl, advKey]
+  );
+  return row ? row.id : null;
+}
+
+async function listCreatorSources(advertiserId = null) {
+  const where = advertiserId ? 'WHERE advertiser_id = ?' : '';
+  const params = advertiserId ? [advertiserId] : [];
+  return all(
+    `SELECT ${CREATOR_SOURCE_COLUMNS} FROM creator_sources ${where} ORDER BY updated_at DESC`,
+    params
+  ).map(mapCreatorSource);
+}
+
+async function getCreatorSourcesByIds(ids) {
+  if (!ids || !ids.length) return [];
+  const placeholders = ids.map(() => '?').join(',');
+  return all(
+    `SELECT ${CREATOR_SOURCE_COLUMNS} FROM creator_sources WHERE id IN (${placeholders})`,
+    ids
+  ).map(mapCreatorSource);
+}
+
+async function deleteCreatorSource(id) {
+  const res = run('DELETE FROM creator_sources WHERE id = ?', [id]);
+  persistDb();
+  return res.changes > 0;
+}
+
+async function updateCreatorSourceVerification(id, { status, http, verifiedAt }) {
+  run(
+    `UPDATE creator_sources SET verify_status = ?, verify_http = ?, verified_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [status, http ?? null, verifiedAt, id]
+  );
+  persistDb();
 }
 
 // ── API token store (TikTok / Meta OAuth credentials) ──────────────────────
@@ -569,4 +714,9 @@ module.exports = {
   saveKpiEntry,
   listKpiEntries,
   getLatestKpiEntry,
+  saveCreatorSource,
+  listCreatorSources,
+  getCreatorSourcesByIds,
+  deleteCreatorSource,
+  updateCreatorSourceVerification,
 };

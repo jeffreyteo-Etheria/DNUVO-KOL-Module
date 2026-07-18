@@ -182,6 +182,8 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
     <button class="rnode" id="rn-3" onclick="goStep(3)"><div class="rdot">3</div><div class="rlabel">Recommend</div><div class="rlock" id="lk-3">🔒</div></button>
     <div class="rline" id="rl-3"></div>
     <button class="rnode" id="rn-4" onclick="goStep(4)"><div class="rdot">$</div><div class="rlabel">Budget · KPI</div><div class="rlock" id="lk-4">🔒</div></button>
+    <div class="rline" id="rl-4"></div>
+    <button class="rnode" id="rn-5" onclick="goStep(5)"><div class="rdot">%</div><div class="rlabel">Pricing · Promo</div><div class="rlock" id="lk-5">🔒</div></button>
   </div>
 </div>
 
@@ -351,6 +353,34 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
     <div id="manual-kol-list" class="mt"></div>
   </div>
 
+  <div class="card mb2">
+    <div class="card-hd">Creator Sources Library <span style="font-weight:400;text-transform:none;letter-spacing:0">— accumulates across every campaign for this advertiser</span></div>
+    <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:8px">Save a creator once and it stays available for every future campaign — nothing here is scoped to just this campaign. Re-verify any time; handles and rates go stale.</div>
+    <div class="g3" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Name</label><input id="cs-name" placeholder="e.g. Dr Samuel GP"></div>
+      <div class="fld" style="margin:0"><label>Platform</label><select id="cs-platform"><option>TikTok</option><option>Instagram</option></select></div>
+      <div class="fld" style="margin:0"><label>Handle</label><input id="cs-handle" placeholder="creatorhandle"></div>
+    </div>
+    <div class="g3" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Profile URL</label><input id="cs-url" placeholder="https://www.tiktok.com/@creatorhandle"></div>
+      <div class="fld" style="margin:0"><label>Followers</label><input id="cs-followers" type="number" min="0"></div>
+      <div class="fld" style="margin:0"><label>Tier</label><select id="cs-tier"><option value="">—</option><option>nano</option><option>micro</option><option>mid</option><option>macro</option><option>mega</option></select></div>
+    </div>
+    <div class="g2" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Rate note</label><input id="cs-rate" placeholder="e.g. S$700-1,200, 2-3 posts"></div>
+      <div class="fld" style="margin:0"><label>Niche / notes</label><input id="cs-notes" placeholder="e.g. K-beauty, 30-day skin diary format"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn btn-gold" onclick="addCreatorToLibrary()">Save to Library</button>
+      <button class="btn btn-outline" onclick="loadCreatorLibrary()">Refresh Library</button>
+      <button class="btn btn-outline" onclick="verifyAllLibrary()">Re-verify All Loaded</button>
+      <button class="btn btn-outline" onclick="seedStarterCreatorLibrary()">Load Starter List (unverified)</button>
+    </div>
+    <div class="fld mt" style="margin-bottom:0"><label>Filter library</label><input id="cs-filter" placeholder="Search name, handle, platform, tier..." oninput="renderCreatorLibrary()"></div>
+    <div id="cs-msg" class="mt"></div>
+    <div id="cs-library" class="mt"></div>
+  </div>
+
   <div class="g2 mb2">
     <div class="card">
       <div class="card-hd">How many creators per tier?</div>
@@ -366,7 +396,9 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <label class="chk-line"><input type="checkbox" id="p-paid" checked>Paid UGC partnerships</label>
       <label class="chk-line"><input type="checkbox" id="p-gift" checked>Product gifting (nano/micro)</label>
       <label class="chk-line"><input type="checkbox" id="p-live">Livestream co-hosts (Shopee LIVE / TikTok LIVE — requires LIVE commerce history)</label>
-      <label class="chk-line"><input type="checkbox" id="p-affiliate" checked>Affiliate commission codes (25% d.nuvo standard)</label>
+      <label class="chk-line"><input type="checkbox" id="p-affiliate" checked>LIVE-selling affiliate commission (brand-set rate, on top of platform commission)</label>
+      <label class="chk-line"><input type="checkbox" id="p-affiliate-shop">Non-LIVE affiliate codes (creator's own Shopee/TikTok Shop, not during a LIVE)</label>
+      <div class="ib ibsk mt"><div class="ibl" style="color:var(--sk)">Two different commission mechanics</div><div class="ibb">LIVE-selling commission and non-LIVE affiliate-shop commission are separate, brand-set rates that each campaign sets for itself — both sit on top of the platform's own standard commission, they don't replace it. Set the actual rates in Pricing · Promo, which also shows the floor-price impact of stacking these.</div></div>
       <div class="ib ibs mt"><div class="ibl" style="color:var(--sg)">Hard rules applied to every candidate</div><div class="ibb">• Local audience ≥ <strong id="floor-echo">70</strong>% (from Setup) — instant exclude below<br>• Active in last 90 days — dormant accounts excluded<br>• ER ≥ 3% TikTok / ≥ 2% IG vs tier benchmark<br>• Profile must fit d.nuvo positioning (clinical ceramide skincare, sensitive skin, K-beauty)<br>• Cost included where publicly known; otherwise marked "rate on request"</div></div>
       <div class="ib ibg mt"><div class="ibl" style="color:#8A7000">Verification honesty rule</div><div class="ibb">The AI proposes candidates from search knowledge. It cannot click links. Every candidate carries a <span class="verify-badge">⏳ pending link check</span> badge until the backend module's <code style="font-family:'JetBrains Mono',monospace;font-size:10px">/verify-creator</code> endpoint confirms the profile URL is live and active. No candidate is ever labelled "verified" without that check.</div></div>
     </div>
@@ -516,9 +548,113 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
   </div>
 </div>
 
+<!-- ════════ STEP 5: PRICING & PROMO ════════ -->
+<div class="pg" id="pg-5">
+  <div class="stitle">Pricing & Promotions Playbook</div>
+  <div class="ib ibr mb2">
+    <div class="ibl" style="color:var(--rs)">Review-gate rule</div>
+    <div class="ibb">No paid discount depth beyond BAU (flash, LIVE voucher, mega sale) until the primary marketplace listing has <strong>15+ reviews</strong>. Below that: gifting/nano seeding and organic content only — this matches the KPI gate in Budget · KPI.</div>
+  </div>
+  <div class="ib ibsk mb2">
+    <div class="ibl" style="color:var(--sk)">What's per-campaign vs. platform-wide</div>
+    <div class="ibb">SKU pricing (SRP/COGS) and KOL commission rates below are set independently per campaign — the d.nuvo SKU list and its 25%/12% KOL rates only pre-fill as a reference when you're working under the DNUVO advertiser; every other advertiser starts with an empty SKU table and 0% KOL commission until you set its own. <strong>Platform commission (Shopify/Shopee/Lazada/TikTok Shop) is the one exception</strong> — those default the same for every campaign because they're the marketplace's own fee schedule, not something a brand negotiates.</div>
+  </div>
+
+  <div class="g2 mb2">
+    <div class="card">
+      <div class="card-hd">Platform commission rates <span style="font-weight:400;text-transform:none;letter-spacing:0">— edit to match your storefronts</span></div>
+      <div class="g4" style="gap:8px">
+        <div class="fld" style="margin:0"><label>Shopify D2C %</label><input id="pr-comm-shopify" type="number" value="2" min="0" max="60" oninput="renderPricingTable()"></div>
+        <div class="fld" style="margin:0"><label>Shopee %</label><input id="pr-comm-shopee" type="number" value="18" min="0" max="60" oninput="renderPricingTable()"></div>
+        <div class="fld" style="margin:0"><label>Lazada %</label><input id="pr-comm-lazada" type="number" value="12" min="0" max="60" oninput="renderPricingTable()"></div>
+        <div class="fld" style="margin:0"><label>TikTok Shop %</label><input id="pr-comm-tiktok" type="number" value="9" min="0" max="60" oninput="renderPricingTable()"></div>
+      </div>
+      <div style="font-size:10.5px;color:var(--ms);margin-top:4px">Floor price = (COGS × 4 + S$5) ÷ (1 − platform commission). These are the marketplace's own cut only — LIVE/affiliate KOL commission is separate, see below.</div>
+      <div class="ib ibg mt" style="margin-bottom:0"><div class="ibl" style="color:#8A7000">Defaults last checked Jul 2026 — verify in Seller Centre</div><div class="ibb">Shopee: skincare commission runs ~7.6% (non-Mall) to ~15.3% (Mall) plus a 2.18% transaction fee, and a new ~5% technical support fee began rolling out to SG sellers from Feb 2026 — default set to 18% as a conservative blend. TikTok Shop: default platform commission is 8.175% (standard sellers, from the Apr 2026 rate update) — default set to 9%, but exact rate is category-specific. Lazada not independently re-verified this session. Rates vary by category/seller tier — treat these as starting points, not quotes.</div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Add / import SKUs</div>
+      <div class="g3" style="gap:8px">
+        <div class="fld" style="margin:0"><label>SKU name</label><input id="pr-sku-name" placeholder="e.g. Vitamin C Serum"></div>
+        <div class="fld" style="margin:0"><label>SRP (S$)</label><input id="pr-sku-srp" type="number" min="0" step="0.01"></div>
+        <div class="fld" style="margin:0"><label>COGS (S$)</label><input id="pr-sku-cogs" type="number" min="0" step="0.01"></div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="addSkuRow()">+ Add SKU row</button>
+      <button class="btn btn-outline btn-sm" onclick="importSkusFromSetup()">Import from Setup SKUs</button>
+      <div style="font-size:10.5px;color:var(--ms);margin-top:6px">Import reads the SRP as the first S$ figure per line from Setup's "Hero SKUs or bundles" field. COGS is not in that field — set it manually per row for an accurate floor.</div>
+    </div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">SKU floor & max safe discount by channel</div>
+    <div id="pricing-table"></div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">LIVE & creator-shop affiliate — stacked commission</div>
+    <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:8px">These two mechanics add a brand-set KOL commission <strong>on top of</strong> the platform commission above — both are deducted from the same sale, so the real floor is higher than the base channel floor. Each campaign sets its own rate here (defaults to 0% until you set it, except the DNUVO advertiser which pre-fills its own 25%/12% reference rates).</div>
+    <div class="g3" style="gap:8px;margin-bottom:10px">
+      <div class="fld" style="margin:0"><label>LIVE-selling KOL commission %</label><input id="pr-kol-live" type="number" value="0" min="0" max="100" oninput="renderPricingTable()"></div>
+      <div class="fld" style="margin:0"><label>Non-LIVE affiliate-shop KOL commission %</label><input id="pr-kol-shop" type="number" value="0" min="0" max="100" oninput="renderPricingTable()"></div>
+      <div class="fld" style="margin:0"><label>LIVE base platform</label><select id="pr-kol-live-base" onchange="renderPricingTable()"><option value="tiktok">TikTok Shop commission</option><option value="shopee">Shopee commission</option></select></div>
+    </div>
+    <div id="pricing-live-table"></div>
+  </div>
+
+  <div class="stitle" style="font-size:14px">Promo Mechanics Reference</div>
+  <div id="promo-playbook" class="g3 mb2"></div>
+
+  <div class="card mb2">
+    <div class="card-hd">Mega sale co-funding (9.9 · 11.11 · 12.12)</div>
+    <table class="dt">
+      <thead><tr><th>Element</th><th>Typical split</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Discount depth</td><td>20–30% off SRP</td><td>Validate every SKU against its floor before committing — this is the deepest recurring discount in the calendar.</td></tr>
+        <tr><td>Who funds it</td><td>Brand absorbs 12–15% · platform/marketplace co-funds the rest</td><td>Confirm the platform's co-funding % during campaign nomination — it is not automatic.</td></tr>
+        <tr><td>Prep lead time</td><td>Brief affiliates/KOLs 10–14 days out</td><td>Nominate for category campaigns before the platform's deadline; late nominations get less placement.</td></tr>
+        <tr><td>Shopee cap</td><td>~20–22% after platform commission</td><td>Deeper than this and Shopee-channel margin goes below floor on most SKUs.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">AI pricing & bundle strategy <span style="font-weight:400;text-transform:none;letter-spacing:0">— generated from your campaign mix</span></div>
+    <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:8px">Uses the promo periods selected in Setup, your SKU floors above, and the review-gate rule to recommend which SKUs/bundles to discount, at what depth, on which promo mechanism — instead of generic advice.</div>
+    <button class="btn btn-gold" onclick="buildPricingStrategy()">Generate AI Pricing & Bundle Strategy →</button>
+    <div id="pricing-ai-output" class="mt"></div>
+  </div>
+</div>
+
 <script>
 // ═══ STATE (in-memory only — export/import via JSON file) ═══
 const S = { campaignId:null, campaignName:'', setup:null, creators:null, content:[], schedule:[], budget:null, verifications:[], manualCreators:[], kpiLatest:null, kpiHistory:[], sourcingData:null };
+
+// ═══ PRICING & PROMO (Step 5) — client-side reference calculator, not persisted to campaign snapshot ═══
+const DEFAULT_PRICING_SKUS = [
+  {name:'Vitamin C 15.5% Serum 50ml', srp:52, cogs:8, flag:''},
+  {name:'Calming Barrier Serum 50ml', srp:48, cogs:8, flag:'Shopee flash headroom is thin — cap Shopee discount at 9% even though other channels can go deeper.'},
+  {name:'Eye Cream Peptide 30ml', srp:58, cogs:8, flag:''},
+  {name:'Water Cream Moisturiser 50ml', srp:46, cogs:6, flag:'SRP is close to floor. Consider raising SRP before running any flash promo on this SKU.'},
+  {name:'Ceramide Prep Toner 200ml', srp:38, cogs:6, flag:'SRP may sit at or below the 4×COGS floor on some channels — check before discounting at all.'},
+  {name:'Aqua C Sun Serum SPF50 50ml', srp:42, cogs:4, flag:''},
+];
+let PRICING_SKUS = DEFAULT_PRICING_SKUS.map(s=>({...s}));
+
+const PROMO_PLAYBOOK = [
+  {period:'BAU', title:'BAU (always-on)', cadence:'Permanent baseline', depth:'0% — listed SRP only', mechanic:'Standard listed price on every channel. This is the anchor price all other promo mechanics discount from. Never lower the listed price itself — discounts are always applied via voucher/code/auto-discount.'},
+  {period:'Flash sale (custom)', title:'Flash sale', cadence:'Max 2× per month · 24–72hr window', depth:'Up to 25–30% (Shopify) · 9–18% (Shopee, SKU-dependent)', mechanic:'Auto-discount, no code. Announce via WhatsApp/email 1–2hrs before. Limit to 2–3 hero SKUs per event so the discount reads as scarce, not permanent.'},
+  {period:'LIVE Voucher', title:'LIVE voucher (co-host / self-LIVE)', cadence:'Per scheduled LIVE session', depth:'12–20% for the session window only, SKU-dependent', mechanic:'2-hour voucher active only during the LIVE broadcast. Host verbally drives urgency and requests reviews from buyers. Pair with a co-hosted creator once reviews exist — self-LIVE only (no voucher) is fine pre-gate for building an owned audience.'},
+  {period:'Payday (25th–1st)', title:'Payday window', cadence:'25th of month → 1st of next', depth:'10–15%', mechanic:'Lighter than end-of-month or mega sale — timed to when SG audiences have just been paid. Good slot for Subscribe & Save conversion pushes and bundle offers rather than deep single-SKU discounts.'},
+  {period:'BAU', title:'End-of-month sale', cadence:'Last 3–5 days of each month', depth:'Up to 20% (Shopify) · capped ~13% (Shopee, 16% commission)', mechanic:'Auto-applied, no code. Email D-3 + D-1, WhatsApp broadcast D-1, Meta retargeting. Add a gift-with-purchase above a spend threshold instead of discounting deeper once floor is reached.'},
+  {period:'9.9 Mega Sale', title:'9.9 mega sale', cadence:'Annual — early Sep', depth:'20–30%, co-funded with platform', mechanic:'Nominate for the platform category campaign 10–14 days ahead. Brief all affiliates/KOLs before the deadline. Brand typically absorbs 12–15%, platform co-funds the rest — confirm the split during nomination.'},
+  {period:'10.10 Sale', title:'10.10 sale', cadence:'Annual — mid Oct', depth:'15–25%', mechanic:'Same mechanic as 9.9 at slightly lower depth. Good slot to push SKUs that under-performed at 9.9 with a fresh angle (bundle instead of single SKU, or vice versa).'},
+  {period:'11.11 Mega Sale', title:'11.11 mega sale', cadence:'Annual — 11 Nov, biggest volume day of the year', depth:'25–30%, co-funded with platform', mechanic:'Highest-traffic mega sale — prioritise ad budget and creator content here over 9.9/10.10 if forced to choose. Validate every SKU floor beforehand; this is the depth most likely to breach floor on thin-margin SKUs.'},
+  {period:'12.12 Sale', title:'12.12 sale', cadence:'Annual — mid Dec, year-end', depth:'20–25%', mechanic:'Pairs well with gifting-season bundle framing. Last major promo of the calendar year — good checkpoint to review which SKUs/bundles earned their promo slot this year.'},
+  {period:'CNY / Raya gifting', title:'CNY / Raya gifting', cadence:'Seasonal — dates shift yearly', depth:'10–15% + gift-with-purchase framing', mechanic:'Bundle-led, not discount-led — gifting sets with festive packaging outperform straight % off for this occasion. Repeat the National Day bundle mechanic (lucky-number price point) if it worked earlier in the year.'},
+  {period:'BAU', title:'Bundles (always-on)', cadence:'Permanent, refreshed seasonally', depth:'Bundle price ~15–25% below sum of parts', mechanic:'Auto-bundle discount, no code, listed as its own product. Target 40%+ blended margin per bundle after COGS. Primary AOV lever — should always be live, independent of the promo calendar above.'},
+  {period:'BAU', title:'Subscribe & Save', cadence:'Permanent once launched', depth:'First cycle 20% off · subsequent cycles 15% off', mechanic:'Recharge/Loop app, D2C only. First-cycle depth drives adoption; ongoing depth still clears floor on every SKU. Highest-LTV mechanic in the whole playbook — 3–5× a one-time buyer.'},
+  {period:'BAU', title:'Review reward', cadence:'Permanent, per verified purchase', depth:'S$8 / S$12 / S$15 escalating voucher (not a % discount)', mechanic:'D+7 written review, D+14 photo review, D+30 social tag — each reward step up incentivises repeat action. Pack-insert QR routes marketplace buyers back to the D2C review page, feeding every other channels listing gallery.'},
+];
 
 // ═══ ACCESS (SocialMIND master network) ═══
 // AUTH.role: 'superadmin' sees every advertiser + campaign; 'advertiser' is scoped to its own dashboard.
@@ -527,6 +663,176 @@ const AUTH = { code:'', role:null, advertiser:null, advertisers:[], activeAdvert
 // Stable per-browser id so usage quotas survive reloads (open-access mode).
 let CID = localStorage.getItem('sm_cid');
 if(!CID){ CID = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2)); localStorage.setItem('sm_cid', CID); }
+
+function pricingFloor(cogs, commPct){
+  const c = Math.max(0, Math.min(99, +commPct||0));
+  return (( +cogs||0 )*4 + 5) / (1 - c/100);
+}
+function pricingChannels(){
+  return [
+    {key:'shopify', label:'Shopify D2C', commEl:'pr-comm-shopify'},
+    {key:'shopee', label:'Shopee', commEl:'pr-comm-shopee'},
+    {key:'lazada', label:'Lazada', commEl:'pr-comm-lazada'},
+    {key:'tiktok', label:'TikTok Shop', commEl:'pr-comm-tiktok'},
+  ];
+}
+function discountTag(pct){
+  if(pct <= 0) return `<span class="tag tR">at/below floor</span>`;
+  if(pct < 10) return `<span class="tag tR">${pct.toFixed(0)}% max</span>`;
+  if(pct < 20) return `<span class="tag tG">${pct.toFixed(0)}% max</span>`;
+  return `<span class="tag tS">${pct.toFixed(0)}% max</span>`;
+}
+function renderPricingTable(){
+  const wrap = document.getElementById('pricing-table');
+  if(!wrap) return;
+  const channels = pricingChannels().map(c=>({...c, comm:+(document.getElementById(c.commEl)?.value)||0}));
+  if(!PRICING_SKUS.length){
+    wrap.innerHTML = `<div class="empty"><h4>No SKUs yet</h4><p>Add a SKU row above or import from Setup.</p></div>`;
+    renderLiveAffiliateTable();
+    return;
+  }
+  const head = `<tr><th>SKU</th><th>SRP (S$)</th><th>COGS (S$)</th>${channels.map(c=>`<th>${c.label} floor / max off</th>`).join('')}<th></th></tr>`;
+  const rows = PRICING_SKUS.map((s,i)=>{
+    const cells = channels.map(c=>{
+      const floor = pricingFloor(s.cogs, c.comm);
+      const pct = s.srp>0 ? Math.max(0,(s.srp-floor)/s.srp*100) : 0;
+      return `<td>S$${floor.toFixed(2)}<br>${discountTag(pct)}</td>`;
+    }).join('');
+    const flagRow = s.flag ? `<tr><td colspan="${3+channels.length+1}" style="background:var(--gdbg);font-size:10.5px;color:#8A7000;padding:5px 10px">⚑ ${s.flag}</td></tr>` : '';
+    return `<tr>
+      <td><input value="${(s.name||'').replace(/"/g,'&quot;')}" oninput="updateSkuField(${i},'name',this.value)" style="width:100%;border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;font-size:11.5px"></td>
+      <td><input type="number" step="0.01" value="${s.srp}" oninput="updateSkuField(${i},'srp',this.value)" style="width:80px;border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;font-size:11.5px"></td>
+      <td><input type="number" step="0.01" value="${s.cogs}" oninput="updateSkuField(${i},'cogs',this.value)" style="width:80px;border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;font-size:11.5px"></td>
+      ${cells}
+      <td><button class="btn btn-outline btn-sm" onclick="removeSkuRow(${i})">✕</button></td>
+    </tr>${flagRow}`;
+  }).join('');
+  wrap.innerHTML = `<table class="dt">${head}${rows}</table>`;
+  renderLiveAffiliateTable();
+}
+function renderLiveAffiliateTable(){
+  const wrap = document.getElementById('pricing-live-table');
+  if(!wrap) return;
+  if(!PRICING_SKUS.length){
+    wrap.innerHTML = `<div class="empty"><h4>No SKUs yet</h4><p>Add a SKU above first.</p></div>`;
+    return;
+  }
+  const liveKol = +document.getElementById('pr-kol-live')?.value || 0;
+  const shopKol = +document.getElementById('pr-kol-shop')?.value || 0;
+  const liveBase = document.getElementById('pr-kol-live-base')?.value || 'tiktok';
+  const basePlatformComm = +document.getElementById(liveBase==='shopee' ? 'pr-comm-shopee' : 'pr-comm-tiktok')?.value || 0;
+  const liveCombined = Math.min(90, basePlatformComm + liveKol);
+  const shopCombined = Math.min(90, basePlatformComm + shopKol);
+  const rows = PRICING_SKUS.map(s=>{
+    const liveFloor = pricingFloor(s.cogs, liveCombined);
+    const livePct = s.srp>0 ? Math.max(0,(s.srp-liveFloor)/s.srp*100) : 0;
+    const shopFloor = pricingFloor(s.cogs, shopCombined);
+    const shopPct = s.srp>0 ? Math.max(0,(s.srp-shopFloor)/s.srp*100) : 0;
+    return `<tr>
+      <td>${(s.name||'').replace(/</g,'&lt;')}</td>
+      <td>S$${liveFloor.toFixed(2)}<br>${discountTag(livePct)}</td>
+      <td>S$${shopFloor.toFixed(2)}<br>${discountTag(shopPct)}</td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<table class="dt"><thead><tr><th>SKU</th><th>LIVE selling floor (${liveCombined.toFixed(1)}% combined)</th><th>Non-LIVE affiliate-shop floor (${shopCombined.toFixed(1)}% combined)</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function updateSkuField(i, field, val){
+  if(!PRICING_SKUS[i]) return;
+  PRICING_SKUS[i][field] = (field==='name') ? val : (+val||0);
+  renderPricingTable();
+}
+function addSkuRow(){
+  const name = document.getElementById('pr-sku-name').value.trim();
+  const srp = +document.getElementById('pr-sku-srp').value||0;
+  const cogs = +document.getElementById('pr-sku-cogs').value||0;
+  if(!name || !srp){ alert('Enter at least a SKU name and SRP.'); return; }
+  PRICING_SKUS.push({name, srp, cogs, flag:''});
+  document.getElementById('pr-sku-name').value='';
+  document.getElementById('pr-sku-srp').value='';
+  document.getElementById('pr-sku-cogs').value='';
+  renderPricingTable();
+}
+function removeSkuRow(i){
+  PRICING_SKUS.splice(i,1);
+  renderPricingTable();
+}
+function importSkusFromSetup(){
+  if(!S.setup || !S.setup.skus || !S.setup.skus.length){
+    alert('No SKUs found in Setup yet. Fill in "Hero SKUs or bundles" in Setup first.');
+    return;
+  }
+  let added = 0;
+  S.setup.skus.forEach(line=>{
+    const priceMatch = line.match(/S?\$\s?([\d,]+(?:\.\d+)?)/);
+    if(!priceMatch) return;
+    const srp = +priceMatch[1].replace(/,/g,'');
+    if(!srp) return;
+    const name = line.split(/[—-]/)[0].trim() || line.trim();
+    PRICING_SKUS.push({name, srp, cogs:0, flag:'Imported from Setup — COGS not captured there, set it manually for an accurate floor.'});
+    added++;
+  });
+  renderPricingTable();
+  alert(added ? `Imported ${added} SKU(s). Set COGS on each imported row to get an accurate floor.` : 'Could not find an S$ price on any Setup SKU line — add rows manually instead.');
+}
+function capturePricingState(){
+  return {
+    skus: PRICING_SKUS,
+    commissions: {
+      shopify: +document.getElementById('pr-comm-shopify')?.value || 0,
+      shopee: +document.getElementById('pr-comm-shopee')?.value || 0,
+      lazada: +document.getElementById('pr-comm-lazada')?.value || 0,
+      tiktok: +document.getElementById('pr-comm-tiktok')?.value || 0,
+    },
+    kol: {
+      live: +document.getElementById('pr-kol-live')?.value || 0,
+      shop: +document.getElementById('pr-kol-shop')?.value || 0,
+      liveBase: document.getElementById('pr-kol-live-base')?.value || 'tiktok',
+    },
+  };
+}
+// Product SKUs and KOL commission rates are campaign-specific — each advertiser/
+// campaign sets its own. The d.nuvo SKU list and its 25%/12% KOL rates are only
+// a reference starting point for the DNUVO advertiser, never a cross-campaign
+// default. Platform commission (Shopify/Shopee/Lazada/TikTok Shop) is the one
+// exception: those are real marketplace fee schedules, not brand-negotiated
+// terms, so they default the same for every advertiser/campaign.
+function isDnuvoAdvertiser(){
+  const adv = activeAdvertiser();
+  return (adv?.brand || '').trim().toUpperCase() === 'DNUVO';
+}
+function restorePricingState(pricing){
+  const dnuvo = isDnuvoAdvertiser();
+  const fallbackSkus = dnuvo ? DEFAULT_PRICING_SKUS.map(s=>({...s})) : [];
+  const fallbackKolLive = dnuvo ? 25 : 0;
+  const fallbackKolShop = dnuvo ? 12 : 0;
+  PRICING_SKUS = (pricing && pricing.skus && pricing.skus.length) ? pricing.skus.map(s=>({...s})) : fallbackSkus;
+  const c = pricing?.commissions || {};
+  // Platform commission — same defaults regardless of advertiser or campaign.
+  document.getElementById('pr-comm-shopify').value = c.shopify ?? 2;
+  document.getElementById('pr-comm-shopee').value = c.shopee ?? 18;
+  document.getElementById('pr-comm-lazada').value = c.lazada ?? 12;
+  document.getElementById('pr-comm-tiktok').value = c.tiktok ?? 9;
+  const k = pricing?.kol || {};
+  document.getElementById('pr-kol-live').value = k.live ?? fallbackKolLive;
+  document.getElementById('pr-kol-shop').value = k.shop ?? fallbackKolShop;
+  document.getElementById('pr-kol-live-base').value = k.liveBase || 'tiktok';
+  renderPricingTable();
+  renderPromoPlaybook();
+}
+function renderPromoPlaybook(){
+  const wrap = document.getElementById('promo-playbook');
+  if(!wrap) return;
+  const activePeriods = new Set((S.setup && S.setup.periods) || []);
+  wrap.innerHTML = PROMO_PLAYBOOK.map(p=>{
+    const active = activePeriods.has(p.period);
+    return `<div class="card">
+      <div class="card-hd">${p.title}${active?`<span class="tag tS">in this campaigns plan</span>`:''}</div>
+      <div style="font-size:11px;color:var(--sl);margin-bottom:6px"><strong>Cadence:</strong> ${p.cadence}</div>
+      <div style="font-size:11px;color:var(--sl);margin-bottom:6px"><strong>Depth:</strong> ${p.depth}</div>
+      <div style="font-size:11.5px;color:var(--sl);line-height:1.6">${p.mechanic}</div>
+    </div>`;
+  }).join('');
+}
 
 async function api(path, opts={}){
   const r = await fetch(path, {
@@ -876,36 +1182,40 @@ HARD RULES:
 - Never fabricate follower counts, ER, or costs as verified. Label every number "est." with a source hint (Modash/Favikon/public profile) and mark each candidate PENDING LINK CHECK — the backend /verify-creator endpoint must confirm the URL is live before outreach.
 - Only suggest creators plausibly active in the last 90 days. If unsure, say "activity unverified".
 - Costs: give SGD ranges from tier benchmarks; write "rate on request" when unknown.
-- d.nuvo non-negotiables: 25% commission linkage, 15 Shopee reviews before paid ads/LIVE, Spark Ad rights on TikTok posts.
+- d.nuvo non-negotiables: 15 Shopee reviews before paid ads/LIVE, Spark Ad rights on TikTok posts.
+- Two distinct commission mechanics — never conflate them: (1) LIVE-selling affiliate commission, brand-set, capped at 25% max, paid to the KOL on TOP OF the TikTok Shop/Shopee platform's own standard commission (both are deducted from a livestream sale). (2) Non-LIVE affiliate codes: sales driven from d.nuvo affiliate links on a creator's own TikTok Shop/Shopee storefront (not during a livestream) — a separate, usually lower, brand-set rate, still on top of the platform's standard commission. Platform commission rates change and vary by category/seller tier — cite them as "confirm current rate in Seller Centre" rather than asserting a fixed %.
 - Verdict before evidence. No em-dashes. SGD. Concise.`;
 
 // ═══ RAIL / NAV ═══
-let unlocked = [true,false,false,false,false];
+let unlocked = [true,false,false,false,false,false];
 function goStep(n){
   if(!unlocked[n]){ alert('Complete Setup first to unlock this step.'); return; }
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.getElementById('pg-'+n).classList.add('on');
-  for(let i=0;i<5;i++){
+  for(let i=0;i<6;i++){
     const node=document.getElementById('rn-'+i);
     node.classList.toggle('on',i===n);
   }
+  if(n===5){ renderPricingTable(); renderPromoPlaybook(); }
 }
 function unlockAll(){
-  unlocked=[true,true,true,true,true];
-  for(let i=1;i<5;i++){ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=''; }
+  unlocked=[true,true,true,true,true,true];
+  for(let i=1;i<6;i++){ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=''; }
   document.getElementById('rn-0').classList.add('done');
   document.getElementById('rl-0').classList.add('done');
+  renderPromoPlaybook();
+  loadCreatorLibrary();
 }
 
 function relockPipeline(){
-  unlocked=[true,false,false,false,false];
-  for(let i=0;i<5;i++){
+  unlocked=[true,false,false,false,false,false];
+  for(let i=0;i<6;i++){
     const node=document.getElementById('rn-'+i);
     node.classList.remove('done');
     node.classList.toggle('on', i===0);
   }
-  for(let i=0;i<4;i++){ const rl=document.getElementById('rl-'+i); if(rl) rl.classList.remove('done'); }
-  const locks={1:'🔒 setup first',2:'🔒',3:'🔒',4:'🔒'};
+  for(let i=0;i<5;i++){ const rl=document.getElementById('rl-'+i); if(rl) rl.classList.remove('done'); }
+  const locks={1:'🔒 setup first',2:'🔒',3:'🔒',4:'🔒',5:'🔒'};
   Object.keys(locks).forEach((i)=>{ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=locks[i]; });
 }
 
@@ -917,6 +1227,7 @@ function resetWorkspaceState(){
   ['campaign-name','s-audience','s-kol-personas','s-content-brief','s-guardrails','s-budget','s-brand-url',
    's-location','s-competitors','s-handles','s-skus','s-date-start','s-date-end','c-footage','v-urls',
    'm-name','m-handle','m-url','m-followers','m-notes',
+   'cs-name','cs-handle','cs-url','cs-followers','cs-rate','cs-notes','cs-filter',
    'k-spend','k-rev','k-orders','k-leads','k-views','k-clicks'].forEach((id)=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -931,13 +1242,17 @@ function resetWorkspaceState(){
   document.querySelectorAll('.s-period').forEach((c)=>{ c.checked=c.value==='BAU'; });
   document.getElementById('c-sku').innerHTML='';
   ['creators-output','content-output','schedule-output','queue-output','verify-output','rec-output',
-   'kpi-output','kpi-history','audit-output','setup-msg','manual-kol-msg','kpi-msg','connection-msg'].forEach((id)=>{
+   'kpi-output','kpi-history','audit-output','setup-msg','manual-kol-msg','kpi-msg','connection-msg',
+   'cs-msg','pricing-ai-output'].forEach((id)=>{
     const el=document.getElementById(id); if(el) el.innerHTML='';
   });
   const bv=document.getElementById('budget-view');
   if(bv) bv.outerHTML=`<div id="budget-view" class="empty"><h4>No budget allocated yet</h4><p>Complete Setup and Section 1 (creator counts), then generate the split below.</p></div>`;
   document.getElementById('rec-inputs-echo').innerHTML='Complete Setup to see your inputs here.';
   document.getElementById('floor-echo').textContent='70';
+  restorePricingState(null);
+  CREATOR_LIBRARY=[];
+  renderCreatorLibrary();
   renderManualCreatorList();
   renderBriefBudgetEcho();
   renderBriefQuality();
@@ -1049,6 +1364,7 @@ function hydrateFromSnapshot(snapshot){
   S.budget = snapshot.budget || null;
   S.verifications = snapshot.verifications || [];
   S.manualCreators = snapshot.manualCreators || [];
+  restorePricingState(snapshot.pricing);
   applySetupToUI();
   if (S.setup) unlockAll();
   document.getElementById('creators-output').innerHTML = S.creators
@@ -1144,6 +1460,7 @@ async function saveCampaignSnapshot(){
           schedule:S.schedule,
           verifications:S.verifications,
           manualCreators:S.manualCreators,
+          pricing:capturePricingState(),
         },
       },
     });
@@ -1228,7 +1545,7 @@ async function sourceCreators(){
   const total=Object.values(tiers).reduce((a,b)=>a+b,0);
   if(!total){alert('Enter at least one creator count.');return;}
   const backup=+t('t-backup');
-  const types=[['p-paid','paid UGC'],['p-gift','product gifting'],['p-live','LIVE co-hosts'],['p-affiliate','affiliate codes']]
+  const types=[['p-paid','paid UGC'],['p-gift','product gifting'],['p-live','LIVE co-hosts'],['p-affiliate','LIVE-selling affiliate commission (brand-set rate)'],['p-affiliate-shop','non-LIVE affiliate codes (creator shop)']]
     .filter(([id])=>document.getElementById(id).checked).map(([,l])=>l);
   const out=document.getElementById('creators-output');
   out.innerHTML=`<div class="card"><div class="loading"><div class="spinner"></div><p>Running multi-actor sourcing for ${total} creators + ${backup} backups in ${S.setup.loc}...</p></div></div>`;
@@ -1268,8 +1585,8 @@ Keep concise.`);
     S.creators = aiBrief;
     out.innerHTML =
       `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Multi-actor sourcing complete</div><div class="ibb">Actors used: ${(sourced.actorsUsed||[]).map(a=>a.actor).join(' · ')}<br>Total candidates scored: ${sourced.totalCandidates || 0} · Shortlist: ${shortlist.length} · Backups: ${backups.length}</div></div>`+
-      renderCreatorTable(shortlist, 'Shortlist — Highest Accuracy Candidates')+
-      renderCreatorTable(backups, 'Backup Pool')+
+      renderCreatorTable(shortlist, 'Shortlist — Highest Accuracy Candidates', 'shortlist')+
+      renderCreatorTable(backups, 'Backup Pool', 'backups')+
       debugPanel+
       `<div class="card"><div class="card-hd">AI Outreach Prioritization (from sourced list)</div>${md(aiBrief)}</div>`+
       `<div class="ib ibg mt"><div class="ibl" style="color:#8A7000">Next action</div><div class="ibb">Copy profile URLs from shortlist and run Creator Link Verification Queue below before final outreach. Only proceed with live profiles.</div></div>`;
@@ -1373,6 +1690,174 @@ function removeManualKol(id){
   renderManualCreatorList();
 }
 
+// ═══ CREATOR SOURCES LIBRARY (accumulative, cross-campaign) ═══
+let CREATOR_LIBRARY = [];
+
+async function loadCreatorLibrary(){
+  const msg = document.getElementById('cs-msg');
+  try{
+    const adv = activeAdvertiser();
+    const q = adv?.id ? `?advertiserId=${adv.id}` : '';
+    const data = await api('/creator-sources'+q);
+    CREATOR_LIBRARY = data.items || [];
+    renderCreatorLibrary();
+    if(msg) msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Library loaded</div><div class="ibb">${CREATOR_LIBRARY.length} creator(s) in the library${adv?` for ${adv.brand}`:''}.</div></div>`;
+  }catch(e){
+    if(msg) msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Unable to load library</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+function verdictTag(status){
+  const s = String(status||'unverified');
+  if(s.startsWith('live')) return `<span class="tag tS">live</span>`;
+  if(s.startsWith('dead')) return `<span class="tag tR">dead</span>`;
+  if(s.startsWith('blocked')||s.startsWith('unreachable')) return `<span class="tag tG">blocked</span>`;
+  if(s.startsWith('redirected')) return `<span class="tag tB">redirected</span>`;
+  return `<span class="tag tG">unverified</span>`;
+}
+
+function renderCreatorLibrary(){
+  const host = document.getElementById('cs-library');
+  if(!host) return;
+  const filter = (document.getElementById('cs-filter')?.value || '').toLowerCase();
+  const items = CREATOR_LIBRARY.filter(c => !filter || [c.name,c.handle,c.platform,c.tier,c.niche].join(' ').toLowerCase().includes(filter));
+  if(!items.length){
+    host.innerHTML = `<div class="empty"><h4>Library empty${filter?' for this filter':''}</h4><p>Save a creator above, or click "Load Starter List" to seed creators referenced in prior d.nuvo planning docs (flagged unverified until you re-check them).</p></div>`;
+    return;
+  }
+  const rows = items.map(c => `
+    <tr>
+      <td>${c.name}</td>
+      <td>${c.platform}${c.handle?' · @'+c.handle:''}</td>
+      <td>${c.followers ? Number(c.followers).toLocaleString() : 'n/a'}</td>
+      <td>${c.tier || '—'}</td>
+      <td>${c.rateNote || '—'}</td>
+      <td>${verdictTag(c.verifyStatus)}${c.verifiedAt?`<div style="font-size:9px;color:var(--ms);margin-top:2px">${new Date(c.verifiedAt).toLocaleDateString()}</div>`:''}</td>
+      <td>${c.profileUrl ? `<a href="${c.profileUrl}" target="_blank" rel="noreferrer">open</a>` : 'n/a'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="addLibraryCreatorToCampaign(${c.id})">+ Campaign</button>
+        <button class="btn btn-outline btn-sm" onclick="verifyLibraryOne(${c.id})">Verify</button>
+        <button class="btn btn-outline btn-sm" onclick="deleteLibraryCreator(${c.id})">Remove</button>
+      </td>
+    </tr>`).join('');
+  host.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>Rate</th><th>Verify</th><th>Profile</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function saveCreatorToLibrary(payload){
+  const adv = activeAdvertiser();
+  const body = { ...payload, advertiserId: adv?.id };
+  const data = await api('/creator-sources', { method:'POST', body });
+  return data.item;
+}
+
+async function addCreatorToLibrary(){
+  const msg = document.getElementById('cs-msg');
+  const name = document.getElementById('cs-name').value.trim();
+  const platform = document.getElementById('cs-platform').value;
+  const handle = document.getElementById('cs-handle').value.trim().replace(/^@/,'');
+  const profileUrl = document.getElementById('cs-url').value.trim();
+  const followers = +document.getElementById('cs-followers').value || 0;
+  const tier = document.getElementById('cs-tier').value;
+  const rateNote = document.getElementById('cs-rate').value.trim();
+  const notes = document.getElementById('cs-notes').value.trim();
+  if(!name || !platform || !profileUrl){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Incomplete</div><div class="ibb">Name, platform, and profile URL are required.</div></div>`;
+    return;
+  }
+  try{
+    await saveCreatorToLibrary({ name, platform, handle, profileUrl, followers, tier, rateNote, niche:notes, notes, source:'manual' });
+    ['cs-name','cs-handle','cs-url','cs-followers','cs-rate','cs-notes'].forEach(id=>document.getElementById(id).value='');
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Saved to library</div><div class="ibb">Now available for every future campaign under this advertiser.</div></div>`;
+    await loadCreatorLibrary();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Save failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+function addLibraryCreatorToCampaign(id){
+  const c = CREATOR_LIBRARY.find(x=>x.id===id);
+  if(!c) return;
+  const item = { id: Date.now(), name:c.name, platform:c.platform, handle:c.handle, profileUrl:c.profileUrl, followers:c.followers, notes:c.notes||c.rateNote||'', source:'library' };
+  S.manualCreators = [item].concat(S.manualCreators || []);
+  renderManualCreatorList();
+  addUrlToVerifyQueue(c.profileUrl);
+  const msg = document.getElementById('cs-msg');
+  if(msg) msg.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Added to campaign</div><div class="ibb">${c.name} added to this campaign's working list below.</div></div>`;
+}
+
+async function verifyLibraryOne(id){ return verifyLibraryIds([id]); }
+async function verifyAllLibrary(){ return verifyLibraryIds(CREATOR_LIBRARY.map(c=>c.id)); }
+
+async function verifyLibraryIds(ids){
+  if(!ids.length) return;
+  const msg = document.getElementById('cs-msg');
+  msg.innerHTML = `<div class="loading"><div class="spinner"></div><p>Verifying ${ids.length} profile link(s)...</p></div>`;
+  try{
+    const data = await api('/creator-sources/verify', { method:'POST', body:{ ids } });
+    await loadCreatorLibrary();
+    const live = data.results.filter(r=>(r.verdict||'').startsWith('live')).length;
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Verification complete</div><div class="ibb">${live}/${data.results.length} live. Checked ${new Date(data.checkedAt).toLocaleString()}.</div></div>`;
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Verification failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function deleteLibraryCreator(id){
+  if(!confirm('Remove this creator from the library? This does not affect any campaign that already used it.')) return;
+  await api('/creator-sources/'+id, { method:'DELETE' });
+  await loadCreatorLibrary();
+}
+
+async function saveManualToLibrary(id){
+  const c = (S.manualCreators||[]).find(x=>x.id===id);
+  if(!c) return;
+  const msg = document.getElementById('manual-kol-msg');
+  try{
+    await saveCreatorToLibrary({ name:c.name, platform:c.platform, handle:c.handle, profileUrl:c.profileUrl, followers:c.followers, notes:c.notes, source:'manual' });
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Saved to library</div><div class="ibb">${c.name} added to the cross-campaign creator library.</div></div>`;
+    await loadCreatorLibrary();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Save failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function saveSourcedToLibrary(listKey, idx){
+  const c = S.sourcingData && S.sourcingData[listKey] && S.sourcingData[listKey][idx];
+  if(!c || !c.profileUrl){ alert('No profile URL to save.'); return; }
+  try{
+    await saveCreatorToLibrary({
+      name: c.name || c.handle || 'Unknown', platform: c.platform || 'Unknown', handle: c.handle || '',
+      profileUrl: c.profileUrl, followers: c.followers || 0, tier: c.tier || '',
+      niche: c.location || '', notes: `Apify-sourced · score ${c.score||0}${c.engagementRate?` · ER ${c.engagementRate}%`:''}`,
+      source: 'apify',
+    });
+    await loadCreatorLibrary();
+    alert('Saved to creator library.');
+  }catch(e){ alert('Save failed: '+e.message); }
+}
+
+async function seedStarterCreatorLibrary(){
+  if(!confirm('Load the starter creator list? These handles were referenced in prior d.nuvo campaign planning docs and are NOT freshly confirmed — all get saved flagged unverified until you click Re-verify.')) return;
+  const starter = [
+    {name:'Dr Samuel GP', platform:'TikTok', handle:'drsamuelgp', profileUrl:'https://www.tiktok.com/@drsamuelgp', tier:'micro', rateNote:'S$2,000-3,500 · 2 posts + endorsement + Spark rights', niche:'Clinical/GP skincare authority'},
+    {name:'graceglazee', platform:'TikTok', handle:'graceglazee', profileUrl:'https://www.tiktok.com/@graceglazee', tier:'micro', rateNote:'S$700-1,200 · 2-3 posts + affiliate code', niche:'K-beauty, 30-day skin diary'},
+    {name:'lifewithmils', platform:'TikTok', handle:'lifewithmils', profileUrl:'https://www.tiktok.com/@lifewithmils', tier:'micro', rateNote:'S$600-1,000 · 2-3 posts + affiliate code', niche:'Lifestyle/wellness, routine narrative'},
+    {name:'evelynnexie', platform:'TikTok', handle:'evelynnexie', profileUrl:'https://www.tiktok.com/@evelynnexie', tier:'nano', rateNote:'S$120-250 · 1-2 posts', niche:'Beauty/food/lifestyle micro'},
+    {name:'gaga_beauty', platform:'TikTok', handle:'gaga_beauty', profileUrl:'https://www.tiktok.com/@gaga_beauty', tier:'micro', rateNote:'S$600-900 · 2 posts + 1 co-hosted LIVE', niche:'Beauty reviews/tutorials, LIVE co-host'},
+    {name:'vedawinfam', platform:'TikTok', handle:'vedawinfam', profileUrl:'https://www.tiktok.com/@vedawinfam', tier:'mid', rateNote:'S$2,000 · 3-part series incl. 1 co-hosted LIVE', niche:'Thai/SG lifestyle+family, LIVE commerce history'},
+    {name:'jannatul_mitsuisen', platform:'TikTok', handle:'jannatul_mitsuisen', profileUrl:'https://www.tiktok.com/@jannatul_mitsuisen', tier:'macro', rateNote:'Max S$2,500 · verify rate first', niche:'Large SG skincare reach'},
+  ];
+  const msg = document.getElementById('cs-msg');
+  msg.innerHTML = `<div class="loading"><div class="spinner"></div><p>Saving ${starter.length} starter creators...</p></div>`;
+  try{
+    for(const c of starter){ await saveCreatorToLibrary({ ...c, source:'doc-reference — needs re-verify' }); }
+    await loadCreatorLibrary();
+    msg.innerHTML = `<div class="ib ibg"><div class="ibl" style="color:#8A7000">Starter list loaded — unverified</div><div class="ibb">${starter.length} creator(s) added. Handles and rates were captured from prior planning docs and are NOT freshly confirmed. Click "Re-verify All Loaded" now, and treat rate notes as negotiation starting points, not quotes.</div></div>`;
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Seeding failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
 function renderManualCreatorList(){
   const host = document.getElementById('manual-kol-list');
   if(!host) return;
@@ -1389,7 +1874,7 @@ function renderManualCreatorList(){
       <td>${c.followers ? Number(c.followers).toLocaleString() : 'n/a'}</td>
       <td>${c.profileUrl ? `<a href="${c.profileUrl}" target="_blank" rel="noreferrer">open</a>` : 'n/a'}</td>
       <td>${c.notes || '—'}</td>
-      <td><button class="btn btn-outline" onclick="addUrlToVerifyQueue('${String(c.profileUrl || '').replace(/'/g, '&#39;')}')">Queue verify</button> <button class="btn btn-outline" onclick="removeManualKol(${c.id})">Remove</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-outline" onclick="addUrlToVerifyQueue('${String(c.profileUrl || '').replace(/'/g, '&#39;')}')">Queue verify</button> <button class="btn btn-outline" onclick="saveManualToLibrary(${c.id})">Save to Library</button> <button class="btn btn-outline" onclick="removeManualKol(${c.id})">Remove</button></td>
     </tr>`).join('');
   host.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Handle</th><th>Followers</th><th>Profile</th><th>Notes</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -1524,6 +2009,41 @@ Give specific, executable actions with effort (Low/Med/High), timeline, and expe
     out.innerHTML=results.map((r,i)=>`<div class="card mb"><div class="card-hd">${names[mods[i]].split('(')[0]}</div>${md(r)}</div>`).join('');
     document.getElementById('rn-3').classList.add('done');document.getElementById('rl-3').classList.add('done');
   }catch(e){out.innerHTML=`<div class="card"><div class="ib ibr"><div class="ibl" style="color:var(--rs)">Error</div><div class="ibb">${e.message}</div></div></div>`;}
+}
+
+// ═══ STEP 5: PRICING & PROMO STRATEGY (AI) ═══
+async function buildPricingStrategy(){
+  if(!S.setup){ alert('Complete Setup first.'); return; }
+  if(!PRICING_SKUS.length){ alert('Add at least one SKU in the calculator above first.'); return; }
+  const out=document.getElementById('pricing-ai-output');
+  out.innerHTML=`<div class="card"><div class="loading"><div class="spinner"></div><p>Generating pricing & bundle strategy from your SKU floors and campaign mix...</p></div></div>`;
+  const channels = pricingChannels().map(c=>({...c, comm:+(document.getElementById(c.commEl)?.value)||0}));
+  const skuLines = PRICING_SKUS.map(s=>{
+    const floors = channels.map(c=>`${c.label} floor S$${pricingFloor(s.cogs,c.comm).toFixed(2)}`).join(', ');
+    return `- ${s.name}: SRP S$${s.srp}, COGS S$${s.cogs} — ${floors}${s.flag ? ' — FLAG: '+s.flag : ''}`;
+  }).join('\n');
+  const liveKol = +document.getElementById('pr-kol-live').value || 0;
+  const shopKol = +document.getElementById('pr-kol-shop').value || 0;
+  try{
+    const text = await ai(`d.nuvo pricing & bundle strategy across the promo calendar.
+Campaign promo periods selected in Setup: ${(S.setup.periods||[]).join(', ') || 'none selected'}.
+Platforms: ${(S.setup.platforms||[]).join(', ')}. Market: ${S.setup.loc}.
+
+Pre-computed SKU economics — use these numbers exactly, do not recompute or invent floors:
+${skuLines}
+
+KOL commission stacks on top of platform commission for creator-driven sales: LIVE-selling max ${liveKol}%, non-LIVE affiliate-shop ${shopKol}%.
+
+Task: for each promo mechanism present in the selected periods (plus BAU, Flash sale, LIVE voucher and Bundles which always apply), recommend:
+1) Which SKU(s) or bundle to feature.
+2) Discount depth in %, staying strictly inside the floor room shown above for that channel.
+3) One-line rationale tied to margin, inventory, or audience fit.
+Flag any period where every SKU's floor room is too thin (<10%) to run safely, and say so plainly instead of forcing a number.
+Respect the 15-review gate before any paid discount deeper than BAU. Keep it a scannable list, not prose paragraphs.`);
+    out.innerHTML = `<div class="card">${md(text)}</div>`;
+  }catch(e){
+    out.innerHTML = `<div class="card"><div class="ib ibr"><div class="ibl" style="color:var(--rs)">Error</div><div class="ibb">${e.message}</div></div></div>`;
+  }
 }
 
 // ═══ STEP 4: BUDGET & KPI ═══
@@ -1664,7 +2184,7 @@ function md(text){
   }).join('');
 }
 
-function renderCreatorTable(items, title){
+function renderCreatorTable(items, title, listKey){
   if(!items || !items.length) return `<div class="ib ibg"><div class="ibl" style="color:#8A7000">${title}</div><div class="ibb">No candidates found.</div></div>`;
   const rows = items.map((c, i) => `
     <tr>
@@ -1676,7 +2196,7 @@ function renderCreatorTable(items, title){
       <td>${c.localConfidence !== undefined ? `${Math.round(c.localConfidence*100)}%` : 'n/a'}</td>
       <td>${c.score || 0}</td>
       <td>${c.profileUrl ? `<a href="${c.profileUrl}" target="_blank" rel="noreferrer">open</a>` : 'n/a'}</td>
-      <td>${c.profileUrl ? `<button class="btn btn-outline" onclick="addUrlToVerifyQueue('${String(c.profileUrl || '').replace(/'/g, '&#39;')}')">Add to verify</button>` : 'n/a'}</td>
+      <td style="white-space:nowrap">${c.profileUrl ? `<button class="btn btn-outline" onclick="addUrlToVerifyQueue('${String(c.profileUrl || '').replace(/'/g, '&#39;')}')">Add to verify</button>` : 'n/a'}${(c.profileUrl && listKey) ? ` <button class="btn btn-outline" onclick="saveSourcedToLibrary('${listKey}',${i})">Save to Library</button>` : ''}</td>
     </tr>
   `).join('');
   return `

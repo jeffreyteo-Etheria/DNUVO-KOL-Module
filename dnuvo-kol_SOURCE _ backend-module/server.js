@@ -37,6 +37,11 @@ const {
   saveKpiEntry,
   listKpiEntries,
   getLatestKpiEntry,
+  saveCreatorSource,
+  listCreatorSources,
+  getCreatorSourcesByIds,
+  deleteCreatorSource,
+  updateCreatorSourceVerification,
 } = require('./src/db');
 
 const app = express();
@@ -233,6 +238,73 @@ app.post('/verify-creator', async (req, res) => {
   if (!(await requireQuota(req, res, 'verify_urls', urls.length))) return;
   const results = await Promise.all(urls.map(verifyCreator));
   res.json({ checkedAt: new Date().toISOString(), results });
+});
+
+// ── Creator sources (accumulative, cross-campaign creator library) ─────────
+// Advertiser role is always scoped to its own library; super admin may pass
+// ?advertiserId= to view one advertiser's library, or omit it to see all.
+app.get('/creator-sources', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const advertiserId = access.role === 'superadmin'
+      ? (req.query.advertiserId ? Number(req.query.advertiserId) : null)
+      : access.advertiser.id;
+    res.json({ items: await listCreatorSources(advertiserId) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/creator-sources', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const body = req.body || {};
+    const advertiserId = access.role === 'superadmin'
+      ? (body.advertiserId ? Number(body.advertiserId) : null)
+      : access.advertiser.id;
+    const id = await saveCreatorSource({ ...body, advertiserId });
+    const [saved] = await getCreatorSourcesByIds([id]);
+    res.json({ saved: true, item: saved });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.delete('/creator-sources/:id', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const deleted = await deleteCreatorSource(Number(req.params.id));
+    res.json({ deleted });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Re-runs the same live HTTP check /verify-creator uses, then writes the
+// verdict back onto each creator_sources row so the library's verification
+// status stays current instead of a one-time check that goes stale.
+app.post('/creator-sources/verify', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const ids = (req.body.ids || []).map(Number).slice(0, 20);
+    if (!ids.length) return res.status(400).json({ error: 'ids[] required' });
+    const rows = await getCreatorSourcesByIds(ids);
+    if (!rows.length) return res.status(404).json({ error: 'No matching creator sources' });
+    if (!(await requireQuota(req, res, 'verify_urls', rows.length))) return;
+    const checkedAt = new Date().toISOString();
+    const results = await Promise.all(rows.map(async (r) => {
+      const v = await verifyCreator(r.profileUrl);
+      await updateCreatorSourceVerification(r.id, { status: v.verdict, http: v.httpStatus, verifiedAt: checkedAt });
+      return { id: r.id, ...v };
+    }));
+    res.json({ checkedAt, results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Apify multi-actor KOL sourcing ────────────────────────────────────────
@@ -483,6 +555,8 @@ app.post('/campaigns/save', async (req, res) => {
       budget: snapshot.budget,
       schedule: snapshot.schedule,
       verifications: snapshot.verifications,
+      manualCreators: snapshot.manualCreators,
+      pricing: snapshot.pricing,
     });
     await logCampaignAudit({
       campaignId,
