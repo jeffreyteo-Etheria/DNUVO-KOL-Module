@@ -152,6 +152,20 @@ async function initDb() {
   `);
 
   run(`
+    CREATE TABLE IF NOT EXISTS api_tokens (
+      provider TEXT PRIMARY KEY,
+      data_json TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  run(`
+    CREATE TABLE IF NOT EXISTS oauth_states (
+      state TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+  run(`
     CREATE TABLE IF NOT EXISTS usage_counters (
       user_key TEXT NOT NULL,
       metric TEXT NOT NULL,
@@ -444,6 +458,45 @@ async function getLatestKpiEntry(campaignId) {
   return row ? { ...row, metrics: computeKpiMetrics(row) } : null;
 }
 
+// ── API token store (TikTok / Meta OAuth credentials) ──────────────────────
+async function saveApiToken(provider, data) {
+  run(
+    `INSERT INTO api_tokens (provider, data_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(provider) DO UPDATE SET data_json = excluded.data_json, updated_at = CURRENT_TIMESTAMP`,
+    [provider, JSON.stringify(data)]
+  );
+  persistDb();
+}
+
+async function getApiToken(provider) {
+  const row = get('SELECT data_json FROM api_tokens WHERE provider = ?', [provider]);
+  return row ? JSON.parse(row.data_json) : null;
+}
+
+async function deleteApiToken(provider) {
+  const res = run('DELETE FROM api_tokens WHERE provider = ?', [provider]);
+  persistDb();
+  return res.changes > 0;
+}
+
+// ── OAuth state tokens (CSRF protection for the connect flows) ─────────────
+const OAUTH_STATE_TTL_MS = 15 * 60 * 1000;
+
+async function createOauthState(provider) {
+  const state = crypto.randomBytes(16).toString('hex');
+  run('DELETE FROM oauth_states WHERE created_at < ?', [Date.now() - OAUTH_STATE_TTL_MS]);
+  run('INSERT INTO oauth_states (state, provider, created_at) VALUES (?, ?, ?)', [state, provider, Date.now()]);
+  persistDb();
+  return state;
+}
+
+async function consumeOauthState(state, provider) {
+  const row = get('SELECT provider, created_at AS createdAt FROM oauth_states WHERE state = ?', [state]);
+  if (row) { run('DELETE FROM oauth_states WHERE state = ?', [state]); persistDb(); }
+  if (!row || row.provider !== provider) return false;
+  return Date.now() - Number(row.createdAt) < OAUTH_STATE_TTL_MS;
+}
+
 // ── Usage quotas (per-user cost control for scraping / AI endpoints) ───────
 // Fixed-window counters: each (user_key, metric) pair holds one window.
 // When the window has elapsed the counter resets on next touch.
@@ -496,6 +549,11 @@ module.exports = {
   initDb,
   peekQuota,
   consumeQuota,
+  saveApiToken,
+  getApiToken,
+  deleteApiToken,
+  createOauthState,
+  consumeOauthState,
   getStorageMode,
   saveAdvertiser,
   listAdvertisers,

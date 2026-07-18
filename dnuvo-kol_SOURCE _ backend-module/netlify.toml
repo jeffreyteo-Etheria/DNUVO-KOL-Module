@@ -66,3 +66,18 @@
   from = "/kpi/*"
   to = "/.netlify/functions/api/kpi/:splat"
   status = 200
+
+[[redirects]]
+  from = "/quota"
+  to = "/.netlify/functions/api/quota"
+  status = 200
+
+[[redirects]]
+  from = "/connections"
+  to = "/.netlify/functions/api/connections"
+  status = 200
+
+[[redirects]]
+  from = "/connect/*"
+  to = "/.netlify/functions/api/connect/:splat"
+  status = 200

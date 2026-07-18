@@ -4,10 +4,11 @@
 //           long-lived Page token with instagram_content_publish + pages_manage_posts
 
 const G = 'https://graph.facebook.com/v21.0';
+const { getMetaCreds } = require('./connections');
 
 async function postInstagram({ videoUrl, caption }) {
-  const { META_IG_USER_ID: ig, META_ACCESS_TOKEN: token } = process.env;
-  if (!ig || !token) throw new Error('Meta credentials missing — see API-APPLICATION-GUIDE.md');
+  const { igUserId: ig, token } = await getMetaCreds();
+  if (!ig || !token) throw new Error('Meta not connected — use Connect Meta in the dashboard (see API-APPLICATION-GUIDE.md).');
 
   // 1) Create media container (REELS for video)
   const c = await fetch(`${G}/${ig}/media`, {
@@ -25,8 +26,8 @@ async function postInstagram({ videoUrl, caption }) {
 }
 
 async function postFacebook({ videoUrl, caption }) {
-  const { META_PAGE_ID: page, META_ACCESS_TOKEN: token } = process.env;
-  if (!page || !token) throw new Error('Meta credentials missing — see API-APPLICATION-GUIDE.md');
+  const { pageId: page, token } = await getMetaCreds();
+  if (!page || !token) throw new Error('Meta not connected — use Connect Meta in the dashboard (see API-APPLICATION-GUIDE.md).');
   const r = await fetch(`${G}/${page}/videos`, {
     method: 'POST',
     body: new URLSearchParams({ file_url: videoUrl, description: caption || '', access_token: token }),

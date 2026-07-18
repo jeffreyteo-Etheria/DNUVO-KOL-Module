@@ -10,10 +10,19 @@ const { postTikTok } = require('./src/postTikTok');
 const { postInstagram, postFacebook } = require('./src/postMeta');
 const { sourceKolMultiActor } = require('./src/apifySource');
 const {
+  tiktokAuthorizeUrl,
+  tiktokExchangeCode,
+  metaAuthorizeUrl,
+  metaExchangeCode,
+  connectionStatus,
+} = require('./src/connections');
+const {
   initDb,
   getStorageMode,
   peekQuota,
   consumeQuota,
+  createOauthState,
+  consumeOauthState,
   saveAdvertiser,
   listAdvertisers,
   getAdvertiser,
@@ -596,6 +605,66 @@ app.post('/post/meta', async (req, res) => {
     const fn = platform === 'facebook' ? postFacebook : postInstagram;
     res.json(await fn(req.body));
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Platform connections (TikTok / Meta OAuth) ─────────────────────────────
+// Flow: super admin clicks Connect → /connect/:provider/start returns the
+// authorize URL → platform redirects to /connect/:provider/callback → tokens
+// stored in the repository DB. Callbacks are public but CSRF-state-validated.
+
+function requestBaseUrl(req) {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/+$/, '');
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}`;
+}
+
+app.get('/connections', async (req, res) => {
+  if (!requireSuperCode(req, res)) return;
+  try {
+    res.json(await connectionStatus());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/connect/:provider/start', async (req, res) => {
+  if (!requireSuperCode(req, res)) return;
+  const provider = req.params.provider;
+  if (provider !== 'tiktok' && provider !== 'meta') return res.status(400).json({ error: 'provider must be tiktok or meta' });
+  try {
+    const redirectUri = `${requestBaseUrl(req)}/connect/${provider}/callback`;
+    const state = await createOauthState(provider);
+    const url = provider === 'tiktok'
+      ? tiktokAuthorizeUrl({ state, redirectUri })
+      : metaAuthorizeUrl({ state, redirectUri });
+    res.json({ url, redirectUri });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.get('/connect/:provider/callback', async (req, res) => {
+  const provider = req.params.provider;
+  const back = (msg, ok) => res.redirect(`/?connect_${ok ? 'ok' : 'error'}=${encodeURIComponent(msg)}`);
+  if (provider !== 'tiktok' && provider !== 'meta') return back('Unknown provider', false);
+  const { code, state, error, error_description: errorDescription } = req.query || {};
+  if (error) return back(`${provider}: ${errorDescription || error}`, false);
+  if (!code || !state) return back(`${provider}: missing code/state in callback`, false);
+  try {
+    if (!(await consumeOauthState(String(state), provider))) {
+      return back(`${provider}: state check failed — start the connect flow again from the dashboard`, false);
+    }
+    const redirectUri = `${requestBaseUrl(req)}/connect/${provider}/callback`;
+    if (provider === 'tiktok') {
+      await tiktokExchangeCode({ code: String(code), redirectUri });
+      return back('TikTok connected — tokens stored and auto-refreshing', true);
+    }
+    const page = await metaExchangeCode({ code: String(code), redirectUri });
+    return back(`Meta connected — Page "${page.name}"${page.instagram_business_account ? ' + Instagram' : ' (no IG business account linked)'}`, true);
+  } catch (e) {
+    return back(`${provider}: ${e.message}`, false);
+  }
 });
 
 // ── KPI pull stubs (fill after API approval) ──────────────────────────────

@@ -3,9 +3,10 @@
 // Requires: approved app with video.publish scope + user access token (.env)
 // Flow: 1) init → 2) upload video bytes → 3) TikTok processes & publishes
 
+const { getTikTokAccessToken } = require('./connections');
+
 async function postTikTok({ videoUrl, caption }) {
-  const token = process.env.TIKTOK_ACCESS_TOKEN;
-  if (!token) throw new Error('TIKTOK_ACCESS_TOKEN missing — complete API application first (see guide).');
+  const token = await getTikTokAccessToken(); // stored OAuth token, auto-refreshed
 
   // Step 1 — initialise a PULL_FROM_URL direct post (simplest server flow)
   const init = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {

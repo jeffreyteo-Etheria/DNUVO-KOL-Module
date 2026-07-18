@@ -6,9 +6,31 @@ modules in this repo:
 - `src/postMeta.js` — Instagram Reels + Facebook Page videos (Meta Graph API)
 - `src/postTikTok.js` — TikTok Direct Post (Content Posting API v2)
 
-Both modules read credentials from environment variables (`.env` locally, Netlify
-environment variables in production). Nothing works until the applications below are
-approved and the tokens are set.
+**The dashboard now has an in-built connect flow** (Setup step → "Platform
+Connections" card, super admin only): once the four app credentials below are set
+as environment variables, clicking **Connect TikTok** / **Connect Meta** runs the
+OAuth flow in the browser and stores the tokens durably server-side — TikTok
+tokens auto-refresh, Meta discovers the Page + IG account automatically.
+
+Environment variables that unlock the connect buttons:
+
+```
+TIKTOK_CLIENT_KEY=...      # developers.tiktok.com → your app
+TIKTOK_CLIENT_SECRET=...
+META_APP_ID=...            # developers.facebook.com → your app
+META_APP_SECRET=...
+```
+
+Also register these redirect URIs in the respective app consoles (exact match):
+
+```
+https://<your-site-domain>/connect/tiktok/callback   (TikTok: Login Kit → Redirect URI)
+https://<your-site-domain>/connect/meta/callback     (Meta: Facebook Login → Valid OAuth Redirect URIs)
+```
+
+The manual token route below still works as a fallback (`TIKTOK_ACCESS_TOKEN`,
+`META_ACCESS_TOKEN`, `META_PAGE_ID`, `META_IG_USER_ID`) — stored OAuth
+connections take priority when both exist.
 
 ---
 

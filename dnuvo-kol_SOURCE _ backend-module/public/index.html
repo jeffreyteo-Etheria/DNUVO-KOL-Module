@@ -203,6 +203,16 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
     </div>
     <div id="connection-msg" class="mt"></div>
   </div>
+  <div class="card mb2" id="connections-card" style="display:none">
+    <div class="card-hd">Platform Connections · Super Admin</div>
+    <div id="conn-banner"></div>
+    <div id="conn-status" style="font-size:11.5px;color:var(--sl);line-height:1.7">Loading connection status…</div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="connectPlatform('tiktok')">Connect TikTok</button>
+      <button class="btn btn-outline" onclick="connectPlatform('meta')">Connect Meta (IG + FB)</button>
+      <button class="btn btn-outline" onclick="loadConnections()">Refresh Status</button>
+    </div>
+  </div>
   <div class="card mb2" id="advertiser-card">
     <div class="card-hd">Advertiser Input — Company &amp; Brand</div>
     <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:10px">SocialMIND is the master network. Each advertiser (e.g. DNUVO) is an individual implementation: its logo appears in the top-right menu and every campaign below is saved in the repository under that advertiser.</div>
@@ -579,7 +589,53 @@ async function bootDashboard(){
   renderAdvertiserPill();
   loadCampaignList();
   refreshQuotaPill();
+  showConnectResult();
+  loadConnections();
   document.getElementById('btn-del-campaign').style.display = AUTH.role === 'superadmin' ? '' : 'none';
+}
+
+// ═══ PLATFORM CONNECTIONS (super admin only) ═══
+async function loadConnections(){
+  const card = document.getElementById('connections-card');
+  try{
+    const c = await api('/connections');
+    card.style.display = '';
+    const tag = (on, txt) => `<span class="tag ${on ? 'tS' : 'tG'}">${txt}</span>`;
+    const t = c.tiktok, m = c.meta;
+    const tExtra = t.connected
+      ? (t.source === 'oauth'
+          ? ` — OAuth token, expires ${new Date(t.accessExpiresAt).toLocaleString()}${t.autoRefresh ? ' (auto-refreshes)' : ' ⚠ add TIKTOK_CLIENT_KEY/SECRET so it can auto-refresh'}`
+          : ' — static env token ⚠ expires every 24h; use Connect TikTok for auto-refresh')
+      : (c.appsConfigured.tiktok ? ' — app credentials ready, click Connect TikTok' : ' — waiting for TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET (developers.tiktok.com)');
+    const mExtra = m.connected
+      ? (m.source === 'oauth'
+          ? ` — Page "${m.pageName}"${m.igUsername ? ` + IG @${m.igUsername}` : ' (no IG business account on this Page)'}`
+          : ' — static env credentials')
+      : (c.appsConfigured.meta ? ' — app credentials ready, click Connect Meta' : ' — waiting for META_APP_ID / META_APP_SECRET (developers.facebook.com)');
+    document.getElementById('conn-status').innerHTML =
+      `<div style="margin-bottom:4px">${tag(t.connected,'TikTok')} ${tExtra}</div>`+
+      `<div>${tag(m.connected,'Meta')} ${mExtra}</div>`;
+  }catch(_){ card.style.display = 'none'; } // not super admin (or gated) — hide
+}
+
+async function connectPlatform(provider){
+  try{
+    const d = await api(`/connect/${provider}/start`, { method:'POST' });
+    location.href = d.url; // off to TikTok/Meta authorize screen
+  }catch(e){
+    document.getElementById('conn-banner').innerHTML = `<div class="ib ibr mb"><div class="ibl" style="color:var(--rs)">Cannot start ${provider} connect</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+function showConnectResult(){
+  const params = new URLSearchParams(location.search);
+  const ok = params.get('connect_ok'), err = params.get('connect_error');
+  if(!ok && !err) return;
+  history.replaceState(null, '', location.pathname); // clean the URL
+  const banner = document.getElementById('conn-banner');
+  banner.innerHTML = ok
+    ? `<div class="ib ibs mb"><div class="ibl" style="color:var(--sg)">Connection successful</div><div class="ibb">${ok}</div></div>`
+    : `<div class="ib ibr mb"><div class="ibl" style="color:var(--rs)">Connection failed</div><div class="ibb">${err}</div></div>`;
 }
 
 async function refreshQuotaPill(){
