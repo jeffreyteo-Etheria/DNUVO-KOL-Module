@@ -174,11 +174,24 @@ async function initDb() {
       verify_status TEXT DEFAULT 'unverified',
       verify_http INTEGER,
       verified_at TEXT,
+      tiktok_handle TEXT,
+      instagram_handle TEXT,
+      meta_handle TEXT,
+      line_id TEXT,
+      outreach_stage TEXT DEFAULT 'not_contacted',
+      last_contacted_at TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
   try { run('CREATE UNIQUE INDEX IF NOT EXISTS idx_creator_sources_adv_url ON creator_sources(advertiser_id, profile_url)'); } catch (_) {}
+  // Migrations for creator_sources columns added after the table's first release.
+  try { run('ALTER TABLE creator_sources ADD COLUMN tiktok_handle TEXT'); } catch (_) {}
+  try { run('ALTER TABLE creator_sources ADD COLUMN instagram_handle TEXT'); } catch (_) {}
+  try { run('ALTER TABLE creator_sources ADD COLUMN meta_handle TEXT'); } catch (_) {}
+  try { run('ALTER TABLE creator_sources ADD COLUMN line_id TEXT'); } catch (_) {}
+  try { run("ALTER TABLE creator_sources ADD COLUMN outreach_stage TEXT DEFAULT 'not_contacted'"); } catch (_) {}
+  try { run('ALTER TABLE creator_sources ADD COLUMN last_contacted_at TEXT'); } catch (_) {}
 
   run(`
     CREATE TABLE IF NOT EXISTS api_tokens (
@@ -517,6 +530,12 @@ function mapCreatorSource(r) {
     verifyStatus: r.verifyStatus || 'unverified',
     verifyHttp: r.verifyHttp ?? null,
     verifiedAt: r.verifiedAt || null,
+    tiktokHandle: r.tiktokHandle || '',
+    instagramHandle: r.instagramHandle || '',
+    metaHandle: r.metaHandle || '',
+    lineId: r.lineId || '',
+    outreachStage: r.outreachStage || 'not_contacted',
+    lastContactedAt: r.lastContactedAt || null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -524,26 +543,43 @@ function mapCreatorSource(r) {
 
 const CREATOR_SOURCE_COLUMNS = `id, advertiser_id AS advertiserId, name, platform, handle, profile_url AS profileUrl,
   followers, tier, rate_note AS rateNote, niche, notes, source, verify_status AS verifyStatus,
-  verify_http AS verifyHttp, verified_at AS verifiedAt, created_at AS createdAt, updated_at AS updatedAt`;
+  verify_http AS verifyHttp, verified_at AS verifiedAt, tiktok_handle AS tiktokHandle,
+  instagram_handle AS instagramHandle, meta_handle AS metaHandle, line_id AS lineId,
+  outreach_stage AS outreachStage, last_contacted_at AS lastContactedAt,
+  created_at AS createdAt, updated_at AS updatedAt`;
 
 async function saveCreatorSource(payload) {
-  const {
-    id, advertiserId, name, platform, handle, profileUrl,
-    followers = 0, tier = '', rateNote = '', niche = '', notes = '', source = 'manual',
-  } = payload;
-  if (!name || !platform || !profileUrl) {
-    throw new Error('name, platform, and profileUrl are required');
-  }
-  if (id) {
+  if (payload.id) {
+    // Partial update: merge only the fields the caller actually supplied onto
+    // the existing row, so e.g. a stage-change call ({id, outreachStage}) can't
+    // silently blank out followers/handles/notes the way a blind overwrite would.
+    const existing = mapCreatorSource(get(`SELECT ${CREATOR_SOURCE_COLUMNS} FROM creator_sources WHERE id = ?`, [payload.id]));
+    if (!existing) throw new Error('Creator source not found');
+    const merged = { ...existing, ...Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined)) };
+    if (!merged.name || !merged.platform || !merged.profileUrl) {
+      throw new Error('name, platform, and profileUrl are required');
+    }
     run(
       `UPDATE creator_sources
        SET name = ?, platform = ?, handle = ?, profile_url = ?, followers = ?, tier = ?,
-           rate_note = ?, niche = ?, notes = ?, source = ?, updated_at = CURRENT_TIMESTAMP
+           rate_note = ?, niche = ?, notes = ?, source = ?, tiktok_handle = ?, instagram_handle = ?,
+           meta_handle = ?, line_id = ?, outreach_stage = ?, last_contacted_at = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [name, platform, handle || '', profileUrl, followers, tier, rateNote, niche, notes, source, id]
+      [merged.name, merged.platform, merged.handle || '', merged.profileUrl, merged.followers || 0, merged.tier || '',
+        merged.rateNote || '', merged.niche || '', merged.notes || '', merged.source || 'manual',
+        merged.tiktokHandle || '', merged.instagramHandle || '', merged.metaHandle || '', merged.lineId || '',
+        merged.outreachStage || 'not_contacted', merged.lastContactedAt || null, payload.id]
     );
     persistDb();
-    return Number(id);
+    return Number(payload.id);
+  }
+  const {
+    advertiserId, name, platform, handle, profileUrl,
+    followers = 0, tier = '', rateNote = '', niche = '', notes = '', source = 'manual',
+    tiktokHandle = '', instagramHandle = '', metaHandle = '', lineId = '',
+  } = payload;
+  if (!name || !platform || !profileUrl) {
+    throw new Error('name, platform, and profileUrl are required');
   }
   // Upsert on (advertiser_id, profile_url) so re-saving the same creator from a
   // different campaign updates the one library row instead of duplicating it.
@@ -554,14 +590,18 @@ async function saveCreatorSource(payload) {
   const advKey = advertiserId || 0;
   run(
     `INSERT INTO creator_sources
-      (advertiser_id, name, platform, handle, profile_url, followers, tier, rate_note, niche, notes, source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (advertiser_id, name, platform, handle, profile_url, followers, tier, rate_note, niche, notes, source,
+       tiktok_handle, instagram_handle, meta_handle, line_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(advertiser_id, profile_url) DO UPDATE SET
        name = excluded.name, platform = excluded.platform, handle = excluded.handle,
        followers = excluded.followers, tier = excluded.tier, rate_note = excluded.rate_note,
        niche = excluded.niche, notes = excluded.notes, source = excluded.source,
+       tiktok_handle = excluded.tiktok_handle, instagram_handle = excluded.instagram_handle,
+       meta_handle = excluded.meta_handle, line_id = excluded.line_id,
        updated_at = CURRENT_TIMESTAMP`,
-    [advKey, name, platform, handle || '', profileUrl, followers, tier, rateNote, niche, notes, source]
+    [advKey, name, platform, handle || '', profileUrl, followers, tier, rateNote, niche, notes, source,
+      tiktokHandle, instagramHandle, metaHandle, lineId]
   );
   persistDb();
   const row = get(

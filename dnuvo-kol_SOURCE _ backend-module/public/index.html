@@ -370,15 +370,68 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <div class="fld" style="margin:0"><label>Rate note</label><input id="cs-rate" placeholder="e.g. S$700-1,200, 2-3 posts"></div>
       <div class="fld" style="margin:0"><label>Niche / notes</label><input id="cs-notes" placeholder="e.g. K-beauty, 30-day skin diary format"></div>
     </div>
+    <div class="card-hd" style="margin-top:4px">Contact directory <span style="font-weight:400;text-transform:none;letter-spacing:0">— any channel left blank just won't show a link</span></div>
+    <div class="g4" style="gap:10px">
+      <div class="fld" style="margin:0"><label>TikTok handle</label><input id="cs-ct-tiktok" placeholder="creatorhandle"></div>
+      <div class="fld" style="margin:0"><label>Instagram handle</label><input id="cs-ct-ig" placeholder="creatorhandle"></div>
+      <div class="fld" style="margin:0"><label>Meta / Messenger</label><input id="cs-ct-meta" placeholder="creatorhandle or page"></div>
+      <div class="fld" style="margin:0"><label>LINE ID</label><input id="cs-ct-line" placeholder="line_id (no @)"></div>
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
       <button class="btn btn-gold" onclick="addCreatorToLibrary()">Save to Library</button>
       <button class="btn btn-outline" onclick="loadCreatorLibrary()">Refresh Library</button>
       <button class="btn btn-outline" onclick="verifyAllLibrary()">Re-verify All Loaded</button>
       <button class="btn btn-outline" onclick="seedStarterCreatorLibrary()">Load Starter List (unverified)</button>
+      <button class="btn btn-outline" onclick="downloadContactReport()">⬇ Download Contact & Outreach Report</button>
     </div>
-    <div class="fld mt" style="margin-bottom:0"><label>Filter library</label><input id="cs-filter" placeholder="Search name, handle, platform, tier..." oninput="renderCreatorLibrary()"></div>
+    <div class="g2 mt" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Filter library</label><input id="cs-filter" placeholder="Search name, handle, platform, tier..." oninput="renderCreatorLibrary()"></div>
+      <div class="fld" style="margin:0"><label>Outreach stage</label><select id="cs-stage-filter" onchange="renderCreatorLibrary()">
+        <option value="">All stages</option>
+        <option value="not_contacted">Not contacted</option>
+        <option value="messaged">Messaged</option>
+        <option value="replied">Replied</option>
+        <option value="confirmed">Confirmed</option>
+      </select></div>
+    </div>
     <div id="cs-msg" class="mt"></div>
     <div id="cs-library" class="mt"></div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">Outreach Message Templates <span style="font-weight:400;text-transform:none;letter-spacing:0">— 4 types + follow-up</span></div>
+    <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:8px">Draft, personalise for a creator, copy, and hand off to Google Translate for Thai/Vietnamese/Indonesian audiences. Sending happens on the actual platform (TikTok DM, IG DM, LINE, email) — this tool drafts the message and tracks the pipeline stage once you've sent it.</div>
+    <div class="g3" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Template</label><select id="msg-type" onchange="renderMessageTemplate()">
+        <option value="open">1 — Open Collab Invite (first message)</option>
+        <option value="email">2 — Email Format (longer)</option>
+        <option value="event">3 — Gifted Event Invite (in-person)</option>
+        <option value="gift">4 — Gifted Product Send (remote)</option>
+        <option value="followup">Follow-up (send once, 5 days after no reply)</option>
+      </select></div>
+      <div class="fld" style="margin:0"><label>Creator (from library)</label><select id="msg-creator" onchange="renderMessageTemplate()"><option value="">— none, use [placeholders] —</option></select></div>
+      <div class="fld" style="margin:0"><label>Greeting opener</label><select id="msg-greeting" onchange="renderMessageTemplate()">
+        <option value="en">English only</option>
+        <option value="th">+ Thai opener</option>
+        <option value="vi">+ Vietnamese opener</option>
+        <option value="id">+ Indonesian opener</option>
+      </select></div>
+    </div>
+    <div class="g3" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Your name</label><input id="msg-sender" placeholder="e.g. Alex" oninput="renderMessageTemplate()"></div>
+      <div class="fld" style="margin:0"><label>Event / campaign context (optional)</label><input id="msg-event" placeholder="e.g. Boutiques Asia Bangkok, 24-26 Jul, ICONSIAM" oninput="renderMessageTemplate()"></div>
+      <div class="fld" style="margin:0"><label>Deal note override (optional)</label><input id="msg-deal" placeholder="Defaults to the creator's rate note" oninput="renderMessageTemplate()"></div>
+    </div>
+    <div class="fld"><label>Message preview — edit freely before sending</label><textarea id="msg-preview" style="min-height:220px;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.6"></textarea></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold" onclick="copyMessageToClipboard()">Copy Message</button>
+      <button class="btn btn-outline" onclick="markSelectedCreatorMessaged()">Mark Creator as Messaged</button>
+      <button class="btn btn-outline" onclick="openGoogleTranslate('th')">Google Translate → Thai</button>
+      <button class="btn btn-outline" onclick="openGoogleTranslate('vi')">→ Vietnamese</button>
+      <button class="btn btn-outline" onclick="openGoogleTranslate('id')">→ Indonesian</button>
+    </div>
+    <div style="font-size:10.5px;color:var(--ms);margin-top:6px">Translate links open Google Translate in a new tab with this message pre-filled — it's machine translation, so have a native speaker sanity-check tone and formality before sending, especially for LINE/Thai outreach.</div>
+    <div id="msg-status" class="mt"></div>
   </div>
 
   <div class="g2 mb2">
@@ -1228,9 +1281,14 @@ function resetWorkspaceState(){
    's-location','s-competitors','s-handles','s-skus','s-date-start','s-date-end','c-footage','v-urls',
    'm-name','m-handle','m-url','m-followers','m-notes',
    'cs-name','cs-handle','cs-url','cs-followers','cs-rate','cs-notes','cs-filter',
+   'cs-ct-tiktok','cs-ct-ig','cs-ct-meta','cs-ct-line',
+   'msg-sender','msg-event','msg-deal','msg-preview',
    'k-spend','k-rev','k-orders','k-leads','k-views','k-clicks'].forEach((id)=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
+  const csStageFilter=document.getElementById('cs-stage-filter'); if(csStageFilter) csStageFilter.value='';
+  const msgType=document.getElementById('msg-type'); if(msgType) msgType.value='open';
+  const msgGreeting=document.getElementById('msg-greeting'); if(msgGreeting) msgGreeting.value='en';
   document.getElementById('s-local-floor').value=70;
   document.getElementById('s-pct-kol').value=45;
   document.getElementById('s-pct-paid').value=30;
@@ -1243,7 +1301,7 @@ function resetWorkspaceState(){
   document.getElementById('c-sku').innerHTML='';
   ['creators-output','content-output','schedule-output','queue-output','verify-output','rec-output',
    'kpi-output','kpi-history','audit-output','setup-msg','manual-kol-msg','kpi-msg','connection-msg',
-   'cs-msg','pricing-ai-output'].forEach((id)=>{
+   'cs-msg','pricing-ai-output','msg-status'].forEach((id)=>{
     const el=document.getElementById(id); if(el) el.innerHTML='';
   });
   const bv=document.getElementById('budget-view');
@@ -1716,13 +1774,39 @@ function verdictTag(status){
   return `<span class="tag tG">unverified</span>`;
 }
 
+// Click-through links straight into each platform's messaging surface, not just the profile.
+function contactLinks(c){
+  const links = [];
+  const clean = (v) => String(v||'').trim().replace(/^@/,'');
+  if(clean(c.tiktokHandle)) links.push({label:'TikTok', cls:'tB', url:`https://www.tiktok.com/@${clean(c.tiktokHandle)}`});
+  if(clean(c.instagramHandle)) links.push({label:'IG', cls:'tT', url:`https://ig.me/m/${clean(c.instagramHandle)}`});
+  if(clean(c.metaHandle)) links.push({label:'Messenger', cls:'tG', url:`https://m.me/${clean(c.metaHandle)}`});
+  if(clean(c.lineId)) links.push({label:'LINE', cls:'tS', url:`https://line.me/ti/p/~${clean(c.lineId)}`});
+  return links;
+}
+function contactLinksHtml(c){
+  const links = contactLinks(c);
+  if(!links.length) return '<span style="color:var(--ms)">—</span>';
+  return links.map(l=>`<a class="tag ${l.cls}" href="${l.url}" target="_blank" rel="noreferrer" style="text-decoration:none;display:inline-block;margin:1px 3px 1px 0" title="${l.url}">${l.label}</a>`).join('');
+}
+const STAGE_LABELS = {not_contacted:'Not contacted', messaged:'Messaged', replied:'Replied', confirmed:'Confirmed'};
+function stageSelectHtml(c){
+  const opts = Object.entries(STAGE_LABELS).map(([v,l])=>`<option value="${v}" ${c.outreachStage===v?'selected':''}>${l}</option>`).join('');
+  return `<select onchange="updateCreatorStage(${c.id}, this.value)" style="font-size:10.5px;padding:4px 6px;border:1px solid var(--bd2);border-radius:6px;width:100%">${opts}</select>`;
+}
 function renderCreatorLibrary(){
   const host = document.getElementById('cs-library');
   if(!host) return;
   const filter = (document.getElementById('cs-filter')?.value || '').toLowerCase();
-  const items = CREATOR_LIBRARY.filter(c => !filter || [c.name,c.handle,c.platform,c.tier,c.niche].join(' ').toLowerCase().includes(filter));
+  const stageFilter = document.getElementById('cs-stage-filter')?.value || '';
+  const items = CREATOR_LIBRARY.filter(c => {
+    if(stageFilter && (c.outreachStage||'not_contacted') !== stageFilter) return false;
+    return !filter || [c.name,c.handle,c.platform,c.tier,c.niche].join(' ').toLowerCase().includes(filter);
+  });
+  populateMessageCreatorSelect();
+  renderMessageTemplate();
   if(!items.length){
-    host.innerHTML = `<div class="empty"><h4>Library empty${filter?' for this filter':''}</h4><p>Save a creator above, or click "Load Starter List" to seed creators referenced in prior d.nuvo planning docs (flagged unverified until you re-check them).</p></div>`;
+    host.innerHTML = `<div class="empty"><h4>Library empty${filter||stageFilter?' for this filter':''}</h4><p>Save a creator above, or click "Load Starter List" to seed creators referenced in prior d.nuvo planning docs (flagged unverified until you re-check them).</p></div>`;
     return;
   }
   const rows = items.map(c => `
@@ -1732,15 +1816,16 @@ function renderCreatorLibrary(){
       <td>${c.followers ? Number(c.followers).toLocaleString() : 'n/a'}</td>
       <td>${c.tier || '—'}</td>
       <td>${c.rateNote || '—'}</td>
+      <td>${contactLinksHtml(c)}</td>
+      <td>${stageSelectHtml(c)}</td>
       <td>${verdictTag(c.verifyStatus)}${c.verifiedAt?`<div style="font-size:9px;color:var(--ms);margin-top:2px">${new Date(c.verifiedAt).toLocaleDateString()}</div>`:''}</td>
-      <td>${c.profileUrl ? `<a href="${c.profileUrl}" target="_blank" rel="noreferrer">open</a>` : 'n/a'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-sm" onclick="addLibraryCreatorToCampaign(${c.id})">+ Campaign</button>
         <button class="btn btn-outline btn-sm" onclick="verifyLibraryOne(${c.id})">Verify</button>
         <button class="btn btn-outline btn-sm" onclick="deleteLibraryCreator(${c.id})">Remove</button>
       </td>
     </tr>`).join('');
-  host.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>Rate</th><th>Verify</th><th>Profile</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+  host.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>Rate</th><th>Contact</th><th>Stage</th><th>Verify</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 async function saveCreatorToLibrary(payload){
@@ -1748,6 +1833,17 @@ async function saveCreatorToLibrary(payload){
   const body = { ...payload, advertiserId: adv?.id };
   const data = await api('/creator-sources', { method:'POST', body });
   return data.item;
+}
+
+async function updateCreatorStage(id, stage){
+  try{
+    const payload = { id, outreachStage: stage };
+    if(stage === 'messaged') payload.lastContactedAt = new Date().toISOString();
+    await saveCreatorToLibrary(payload);
+    await loadCreatorLibrary();
+  }catch(e){
+    alert('Stage update failed: '+e.message);
+  }
 }
 
 async function addCreatorToLibrary(){
@@ -1760,13 +1856,17 @@ async function addCreatorToLibrary(){
   const tier = document.getElementById('cs-tier').value;
   const rateNote = document.getElementById('cs-rate').value.trim();
   const notes = document.getElementById('cs-notes').value.trim();
+  const tiktokHandle = document.getElementById('cs-ct-tiktok').value.trim().replace(/^@/,'');
+  const instagramHandle = document.getElementById('cs-ct-ig').value.trim().replace(/^@/,'');
+  const metaHandle = document.getElementById('cs-ct-meta').value.trim().replace(/^@/,'');
+  const lineId = document.getElementById('cs-ct-line').value.trim().replace(/^@/,'');
   if(!name || !platform || !profileUrl){
     msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Incomplete</div><div class="ibb">Name, platform, and profile URL are required.</div></div>`;
     return;
   }
   try{
-    await saveCreatorToLibrary({ name, platform, handle, profileUrl, followers, tier, rateNote, niche:notes, notes, source:'manual' });
-    ['cs-name','cs-handle','cs-url','cs-followers','cs-rate','cs-notes'].forEach(id=>document.getElementById(id).value='');
+    await saveCreatorToLibrary({ name, platform, handle, profileUrl, followers, tier, rateNote, niche:notes, notes, source:'manual', tiktokHandle, instagramHandle, metaHandle, lineId });
+    ['cs-name','cs-handle','cs-url','cs-followers','cs-rate','cs-notes','cs-ct-tiktok','cs-ct-ig','cs-ct-meta','cs-ct-line'].forEach(id=>document.getElementById(id).value='');
     msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Saved to library</div><div class="ibb">Now available for every future campaign under this advertiser.</div></div>`;
     await loadCreatorLibrary();
   }catch(e){
@@ -1808,6 +1908,207 @@ async function deleteLibraryCreator(id){
   await loadCreatorLibrary();
 }
 
+// ═══ OUTREACH MESSAGE TEMPLATES — 4 types + follow-up ═══
+// Structure follows the AkaDigital KOL outreach playbook: no fee mentioned on
+// first contact, signal openness to paid or gifted, rate talk only once the
+// creator shows interest, one follow-up maximum.
+const MESSAGE_TEMPLATES = {
+  open: {
+    label: 'Open Collab Invite (first message)',
+    body: (f) => `Hi ${f.creatorName}!
+
+I'm ${f.sender} from ${f.brand}${f.eventClause}
+
+We've been following your content and love your approach — we think your audience would really connect with what we're doing.
+
+We'd love to explore a collaboration with you — whether that's a paid content partnership, a gifted product experience, or a combination. We're flexible and would love to hear what works best for you.
+
+About ${f.brand}:
+${f.skuLines}
+
+Would you be open to connecting? I'd be happy to share more details!
+
+Warmly,
+${f.sender} · ${f.brand}${f.brandHandleLine}`,
+  },
+  email: {
+    label: 'Email Format (longer, for email contacts)',
+    body: (f) => `Subject: ${f.brand} × ${f.creatorName} — Collab Invite${f.eventSubjectSuffix}
+
+Hi ${f.creatorName},
+
+I'm ${f.sender} from ${f.brand}.
+
+${f.eventParagraph}We came across your work and believe you'd be a wonderful fit for our brand.
+
+About ${f.brand}:
+${f.skuLines}
+
+We welcome both paid content partnerships and gifted product collaborations — whichever suits you and your audience best.
+
+Could we connect this week to explore this together?
+
+Warm regards,
+${f.sender} · ${f.brand}${f.brandHandleLine}`,
+  },
+  event: {
+    label: 'Gifted Event Invite (in-person)',
+    body: (f) => `Hi ${f.creatorName}!
+
+We're ${f.brand}${f.eventInviteClause}
+
+What's in it for you:
+• Full gift set — yours to keep
+• Exclusive early access
+• No strict script — share your honest experience if you love it
+
+${f.heroProductLine}We're also open to a paid partnership if that's something you'd like to discuss. Just reply and I'll send all the details!
+
+${f.sender} · ${f.brand}`,
+  },
+  gift: {
+    label: 'Gifted Product Send (remote, no event)',
+    body: (f) => `Hi ${f.creatorName}!
+
+We're ${f.brand}. We'd love to send you our product set to try!
+
+${f.skuLines}
+
+No obligation to post — but if you love it and want to share, a mention would mean a lot to us. We're also happy to discuss a paid partnership if you're open to it!
+
+Just reply with your address and we'll get it sent out.
+
+${f.sender} · ${f.brand}`,
+  },
+  followup: {
+    label: 'Follow-up (send once, 5 days after no reply)',
+    body: (f) => `Hi ${f.creatorName}, just circling back on my message about ${f.brand}${f.eventFollowupClause}
+
+Totally flexible — paid partnership or gifted product, whichever works for you. ${f.heroProductLine}Let me know if you're interested, no pressure at all!
+
+${f.sender} · ${f.brand}`,
+  },
+};
+const GREETINGS = {
+  th: (name) => `สวัสดีค่ะ/ครับ คุณ${name}`,
+  vi: (name) => `Chào ${name} ạ,`,
+  id: (name) => `Halo Kak ${name},`,
+};
+function buildMergeFields(){
+  const creatorId = +(document.getElementById('msg-creator')?.value) || 0;
+  const creator = creatorId ? CREATOR_LIBRARY.find(c=>c.id===creatorId) : null;
+  const creatorName = creator ? creator.name : '[Creator Name]';
+  const sender = document.getElementById('msg-sender')?.value.trim() || '[Your Name]';
+  const brand = (S.setup && S.setup.brand) || activeAdvertiser()?.brand || '[Brand]';
+  const brandHandle = (S.setup && S.setup.handles && S.setup.handles[0]) || '';
+  const eventTxt = document.getElementById('msg-event')?.value.trim() || '';
+  const skus = (S.setup && S.setup.skus && S.setup.skus.length)
+    ? S.setup.skus.slice(0,3).map(s=>'• '+s).join('\n')
+    : '• [Hero SKU / bundle — add in Setup]';
+  const heroSku = (S.setup && S.setup.skus && S.setup.skus[0]) ? S.setup.skus[0].split(/[—-]/)[0].trim() : '';
+  return {
+    creatorName, sender, brand,
+    brandHandleLine: brandHandle ? `\n${brandHandle}` : '',
+    eventClause: eventTxt ? `, reaching out about ${eventTxt}.` : '.',
+    eventSubjectSuffix: eventTxt ? ` · ${eventTxt}` : '',
+    eventParagraph: eventTxt ? `We're building a small, carefully curated group of creators to collaborate with around ${eventTxt}. ` : '',
+    eventInviteClause: eventTxt ? `, and we'd love to invite you: ${eventTxt}!` : '!',
+    eventFollowupClause: eventTxt ? ` (${eventTxt})!` : '!',
+    heroProductLine: heroSku ? `${heroSku} especially — we think it'll make beautiful content. ` : '',
+    skuLines: skus,
+  };
+}
+function populateMessageCreatorSelect(){
+  const sel = document.getElementById('msg-creator');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— none, use [placeholders] —</option>' +
+    CREATOR_LIBRARY.map(c=>`<option value="${c.id}">${c.name} (${c.platform}${c.handle?' @'+c.handle:''})</option>`).join('');
+  if(current && CREATOR_LIBRARY.some(c=>String(c.id)===current)) sel.value = current;
+}
+function renderMessageTemplate(){
+  const typeSel = document.getElementById('msg-type');
+  const preview = document.getElementById('msg-preview');
+  if(!typeSel || !preview) return;
+  const tmpl = MESSAGE_TEMPLATES[typeSel.value];
+  const f = buildMergeFields();
+  let text = tmpl.body(f);
+  const greetLang = document.getElementById('msg-greeting').value;
+  if(greetLang !== 'en' && GREETINGS[greetLang]){
+    text = GREETINGS[greetLang](f.creatorName) + '\n\n' + text;
+  }
+  preview.value = text;
+}
+function copyMessageToClipboard(){
+  const ta = document.getElementById('msg-preview');
+  const status = document.getElementById('msg-status');
+  const done = () => { if(status) status.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Copied</div><div class="ibb">Message copied to clipboard — paste it into TikTok DM, IG DM, LINE, or email.</div></div>`; };
+  if(navigator.clipboard?.writeText){
+    navigator.clipboard.writeText(ta.value).then(done).catch(()=>{ ta.select(); document.execCommand('copy'); done(); });
+  } else {
+    ta.select(); document.execCommand('copy'); done();
+  }
+}
+async function markSelectedCreatorMessaged(){
+  const id = +(document.getElementById('msg-creator')?.value) || 0;
+  const status = document.getElementById('msg-status');
+  if(!id){ alert('Select a creator from the library first.'); return; }
+  try{
+    await saveCreatorToLibrary({ id, outreachStage:'messaged', lastContactedAt: new Date().toISOString() });
+    await loadCreatorLibrary();
+    if(status) status.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Marked as messaged</div><div class="ibb">Pipeline stage updated in the Creator Sources Library above.</div></div>`;
+  }catch(e){
+    if(status) status.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Update failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+function openGoogleTranslate(lang){
+  const text = document.getElementById('msg-preview').value;
+  if(!text.trim()){ alert('Nothing to translate yet — pick a template first.'); return; }
+  const url = `https://translate.google.com/?sl=en&tl=${lang}&text=${encodeURIComponent(text)}&op=translate`;
+  window.open(url, '_blank', 'noopener');
+}
+
+// ═══ DOWNLOADABLE CONTACT DIRECTORY & OUTREACH REPORT ═══
+function downloadContactReport(){
+  if(!CREATOR_LIBRARY.length){ alert('Load or add creators to the library first.'); return; }
+  const brand = (S.setup && S.setup.brand) || activeAdvertiser()?.brand || 'Brand';
+  const esc = (s) => String(s||'').replace(/</g,'&lt;');
+  const rows = CREATOR_LIBRARY.map(c=>{
+    const links = contactLinks(c).map(l=>`<a href="${l.url}">${l.label}</a>`).join(' · ') || '—';
+    return `<tr><td>${esc(c.name)}</td><td>${esc(c.platform)}${c.handle?' @'+esc(c.handle):''}</td><td>${links}</td><td>${esc(c.followers ? Number(c.followers).toLocaleString() : '—')}</td><td>${esc(c.tier||'—')}</td><td>${esc(c.rateNote||'—')}</td><td>${esc((STAGE_LABELS[c.outreachStage]||'Not contacted'))}</td></tr>`;
+  }).join('');
+  const f = buildMergeFields();
+  const templatesHtml = Object.values(MESSAGE_TEMPLATES).map(t=>
+    `<h3>${esc(t.label)}</h3><pre style="white-space:pre-wrap;font-family:inherit;background:#F8F9FA;border:1px solid #ddd;border-radius:8px;padding:14px;font-size:12.5px;line-height:1.6">${esc(t.body(f))}</pre>`
+  ).join('');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(brand)} — Contact Directory & Outreach Templates</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;padding:28px;max-width:960px;margin:0 auto;color:#1A1A1A}
+table{width:100%;border-collapse:collapse;margin-bottom:28px}
+th,td{border:1px solid #ddd;padding:8px 10px;text-align:left;font-size:12.5px;vertical-align:top}
+th{background:#2E2A22;color:#fff;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+h1{font-size:20px;margin-bottom:4px}
+h2{font-size:15px;margin-top:32px;border-bottom:2px solid #ddd;padding-bottom:6px}
+h3{margin-top:22px;font-size:13px}
+.meta{color:#666;font-size:11.5px;margin-bottom:20px}
+a{color:#0055BB}
+@media print{ body{padding:0} }
+</style></head>
+<body>
+<h1>${esc(brand)} — Contact Directory &amp; Outreach Templates</h1>
+<div class="meta">Generated ${new Date().toLocaleString()} from the DNUVO KOL Module creator sources library. Follower counts and links go stale — re-verify before outreach. Use your browser's Print → Save as PDF to export this page.</div>
+<h2>Contact Directory (${CREATOR_LIBRARY.length} creator${CREATOR_LIBRARY.length===1?'':'s'})</h2>
+<table><thead><tr><th>Creator</th><th>Platform</th><th>Contact links</th><th>Followers</th><th>Tier</th><th>Rate</th><th>Stage</th></tr></thead><tbody>${rows}</tbody></table>
+<h2>Outreach Message Templates — 4 Types + Follow-up</h2>
+<div class="meta">Placeholders show as [Creator Name] / [Your Name] when no creator is selected in the dashboard. No fee is mentioned on first contact — rate discussion happens once a creator shows interest.</div>
+${templatesHtml}
+</body></html>`;
+  const win = window.open('', '_blank');
+  if(!win){ alert('Pop-up blocked — allow pop-ups for this site to open the report.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
 async function saveManualToLibrary(id){
   const c = (S.manualCreators||[]).find(x=>x.id===id);
   if(!c) return;
@@ -1839,13 +2140,13 @@ async function saveSourcedToLibrary(listKey, idx){
 async function seedStarterCreatorLibrary(){
   if(!confirm('Load the starter creator list? These handles were referenced in prior d.nuvo campaign planning docs and are NOT freshly confirmed — all get saved flagged unverified until you click Re-verify.')) return;
   const starter = [
-    {name:'Dr Samuel GP', platform:'TikTok', handle:'drsamuelgp', profileUrl:'https://www.tiktok.com/@drsamuelgp', tier:'micro', rateNote:'S$2,000-3,500 · 2 posts + endorsement + Spark rights', niche:'Clinical/GP skincare authority'},
-    {name:'graceglazee', platform:'TikTok', handle:'graceglazee', profileUrl:'https://www.tiktok.com/@graceglazee', tier:'micro', rateNote:'S$700-1,200 · 2-3 posts + affiliate code', niche:'K-beauty, 30-day skin diary'},
-    {name:'lifewithmils', platform:'TikTok', handle:'lifewithmils', profileUrl:'https://www.tiktok.com/@lifewithmils', tier:'micro', rateNote:'S$600-1,000 · 2-3 posts + affiliate code', niche:'Lifestyle/wellness, routine narrative'},
-    {name:'evelynnexie', platform:'TikTok', handle:'evelynnexie', profileUrl:'https://www.tiktok.com/@evelynnexie', tier:'nano', rateNote:'S$120-250 · 1-2 posts', niche:'Beauty/food/lifestyle micro'},
-    {name:'gaga_beauty', platform:'TikTok', handle:'gaga_beauty', profileUrl:'https://www.tiktok.com/@gaga_beauty', tier:'micro', rateNote:'S$600-900 · 2 posts + 1 co-hosted LIVE', niche:'Beauty reviews/tutorials, LIVE co-host'},
-    {name:'vedawinfam', platform:'TikTok', handle:'vedawinfam', profileUrl:'https://www.tiktok.com/@vedawinfam', tier:'mid', rateNote:'S$2,000 · 3-part series incl. 1 co-hosted LIVE', niche:'Thai/SG lifestyle+family, LIVE commerce history'},
-    {name:'jannatul_mitsuisen', platform:'TikTok', handle:'jannatul_mitsuisen', profileUrl:'https://www.tiktok.com/@jannatul_mitsuisen', tier:'macro', rateNote:'Max S$2,500 · verify rate first', niche:'Large SG skincare reach'},
+    {name:'Dr Samuel GP', platform:'TikTok', handle:'drsamuelgp', profileUrl:'https://www.tiktok.com/@drsamuelgp', tier:'micro', rateNote:'S$2,000-3,500 · 2 posts + endorsement + Spark rights', niche:'Clinical/GP skincare authority', tiktokHandle:'drsamuelgp'},
+    {name:'graceglazee', platform:'TikTok', handle:'graceglazee', profileUrl:'https://www.tiktok.com/@graceglazee', tier:'micro', rateNote:'S$700-1,200 · 2-3 posts + affiliate code', niche:'K-beauty, 30-day skin diary', tiktokHandle:'graceglazee'},
+    {name:'lifewithmils', platform:'TikTok', handle:'lifewithmils', profileUrl:'https://www.tiktok.com/@lifewithmils', tier:'micro', rateNote:'S$600-1,000 · 2-3 posts + affiliate code', niche:'Lifestyle/wellness, routine narrative', tiktokHandle:'lifewithmils'},
+    {name:'evelynnexie', platform:'TikTok', handle:'evelynnexie', profileUrl:'https://www.tiktok.com/@evelynnexie', tier:'nano', rateNote:'S$120-250 · 1-2 posts', niche:'Beauty/food/lifestyle micro', tiktokHandle:'evelynnexie'},
+    {name:'gaga_beauty', platform:'TikTok', handle:'gaga_beauty', profileUrl:'https://www.tiktok.com/@gaga_beauty', tier:'micro', rateNote:'S$600-900 · 2 posts + 1 co-hosted LIVE', niche:'Beauty reviews/tutorials, LIVE co-host', tiktokHandle:'gaga_beauty'},
+    {name:'vedawinfam', platform:'TikTok', handle:'vedawinfam', profileUrl:'https://www.tiktok.com/@vedawinfam', tier:'mid', rateNote:'S$2,000 · 3-part series incl. 1 co-hosted LIVE', niche:'Thai/SG lifestyle+family, LIVE commerce history', tiktokHandle:'vedawinfam'},
+    {name:'jannatul_mitsuisen', platform:'TikTok', handle:'jannatul_mitsuisen', profileUrl:'https://www.tiktok.com/@jannatul_mitsuisen', tier:'macro', rateNote:'Max S$2,500 · verify rate first', niche:'Large SG skincare reach', tiktokHandle:'jannatul_mitsuisen'},
   ];
   const msg = document.getElementById('cs-msg');
   msg.innerHTML = `<div class="loading"><div class="spinner"></div><p>Saving ${starter.length} starter creators...</p></div>`;
