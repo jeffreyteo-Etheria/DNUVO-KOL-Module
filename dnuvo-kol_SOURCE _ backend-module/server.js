@@ -42,6 +42,21 @@ const {
   getCreatorSourcesByIds,
   deleteCreatorSource,
   updateCreatorSourceVerification,
+  bulkImportCreatorSources,
+  searchCreatorSources,
+  saveCalendarEntry,
+  listCalendarEntries,
+  deleteCalendarEntry,
+  saveDeliverable,
+  listDeliverables,
+  updateDeliverableStatus,
+  savePayment,
+  listPayments,
+  updatePaymentStatus,
+  deletePayment,
+  saveActivityKpi,
+  listActivityKpi,
+  summarizeActivityKpi,
 } = require('./src/db');
 
 const app = express();
@@ -302,6 +317,283 @@ app.post('/creator-sources/verify', async (req, res) => {
       return { id: r.id, ...v };
     }));
     res.json({ checkedAt, results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Bulk-populate the creator library from an uploaded CSV/spreadsheet instead
+// of one entry at a time. The dashboard parses the file client-side into
+// { items: [...] } rows shaped like a creator_sources record; each row is
+// validated and upserted independently so one bad row doesn't sink the batch.
+app.post('/creator-sources/bulk-import', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 500) : [];
+    if (!items.length) return res.status(400).json({ error: 'items[] required' });
+    const advertiserId = access.role === 'superadmin'
+      ? (req.body.advertiserId ? Number(req.body.advertiserId) : null)
+      : access.advertiser.id;
+    const result = await bulkImportCreatorSources(items, advertiserId);
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+function toCsvValue(v) {
+  const s = v === null || v === undefined ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+const CREATOR_EXPORT_COLUMNS = [
+  'id', 'name', 'platform', 'handle', 'profileUrl', 'followers', 'tier', 'rateNote', 'niche', 'notes',
+  'tiktokHandle', 'instagramHandle', 'metaHandle', 'lineId', 'outreachStage', 'lastContactedAt',
+  'partnershipType', 'flatFee', 'commissionLivestreamPct', 'commissionUgcAffiliatePct', 'paymentStatus', 'paymentNotes',
+];
+
+// Download the whole (or filtered) creator library as CSV — the section-level
+// "download to populate content" counterpart to bulk-import above.
+app.get('/creator-sources/export', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const advertiserId = access.role === 'superadmin'
+      ? (req.query.advertiserId ? Number(req.query.advertiserId) : null)
+      : access.advertiser.id;
+    const items = await listCreatorSources(advertiserId);
+    const lines = [CREATOR_EXPORT_COLUMNS.join(',')];
+    items.forEach((c) => lines.push(CREATOR_EXPORT_COLUMNS.map((k) => toCsvValue(c[k])).join(',')));
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="creator_sources_${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(lines.join('\n'));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Search creator profiles by name/handle/niche/etc. Super admin may omit
+// advertiserId to search the whole cross-brand creator directory.
+app.get('/creator-sources/search', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const advertiserId = access.role === 'superadmin'
+      ? (req.query.advertiserId ? Number(req.query.advertiserId) : null)
+      : access.advertiser.id;
+    const items = await searchCreatorSources({
+      advertiserId,
+      q: String(req.query.q || ''),
+      partnershipType: String(req.query.partnershipType || ''),
+      outreachStage: String(req.query.outreachStage || ''),
+    });
+    res.json({ items });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Creator activity calendar (UGC / livestream / paid_boost) ──────────────
+app.get('/calendar-entries', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const campaignId = req.query.campaignId ? Number(req.query.campaignId) : null;
+    const advertiserId = access.role === 'superadmin'
+      ? (req.query.advertiserId ? Number(req.query.advertiserId) : null)
+      : access.advertiser.id;
+    res.json({ items: await listCalendarEntries({ campaignId, advertiserId: campaignId ? null : advertiserId }) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/calendar-entries', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const advertiserId = access.role === 'superadmin'
+      ? (req.body.advertiserId ? Number(req.body.advertiserId) : null)
+      : access.advertiser.id;
+    const id = await saveCalendarEntry({ ...req.body, advertiserId });
+    res.json({ saved: true, id });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// Bulk-assign a set of creators onto the calendar in one shot (e.g. loading a
+// 3-month plan for many creators at once) instead of one POST per row.
+app.post('/calendar-entries/bulk-import', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 500) : [];
+    if (!items.length) return res.status(400).json({ error: 'items[] required' });
+    const advertiserId = access.role === 'superadmin'
+      ? (req.body.advertiserId ? Number(req.body.advertiserId) : null)
+      : access.advertiser.id;
+    const results = [];
+    for (let i = 0; i < items.length; i += 1) {
+      try {
+        const id = await saveCalendarEntry({ ...items[i], advertiserId });
+        results.push({ row: i, ok: true, id });
+      } catch (e) {
+        results.push({ row: i, ok: false, error: e.message });
+      }
+    }
+    res.json({ imported: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length, results });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.delete('/calendar-entries/:id', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const deleted = await deleteCalendarEntry(Number(req.params.id));
+    res.json({ deleted });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Proof-of-delivery submissions ───────────────────────────────────────────
+app.get('/deliverables', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const campaignId = req.query.campaignId ? Number(req.query.campaignId) : null;
+    const calendarEntryId = req.query.calendarEntryId ? Number(req.query.calendarEntryId) : null;
+    res.json({ items: await listDeliverables({ campaignId, calendarEntryId }) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/deliverables', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const id = await saveDeliverable(req.body || {});
+    res.json({ saved: true, id });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.patch('/deliverables/:id', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const { status, reviewerNotes } = req.body || {};
+    if (!status) return res.status(400).json({ error: 'status is required' });
+    await updateDeliverableStatus(Number(req.params.id), { status, reviewerNotes });
+    res.json({ updated: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Creator payment / commission ledger ─────────────────────────────────────
+// pay_type: 'flat' | 'gifting' | 'commission_livestream' | 'commission_ugc_affiliate'
+app.get('/payments', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const campaignId = req.query.campaignId ? Number(req.query.campaignId) : null;
+    const creatorId = req.query.creatorId ? Number(req.query.creatorId) : null;
+    const advertiserId = access.role === 'superadmin'
+      ? (req.query.advertiserId ? Number(req.query.advertiserId) : null)
+      : access.advertiser.id;
+    res.json({ items: await listPayments({ campaignId, creatorId, advertiserId: (campaignId || creatorId) ? null : advertiserId }) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/payments', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const advertiserId = access.role === 'superadmin'
+      ? (req.body.advertiserId ? Number(req.body.advertiserId) : null)
+      : access.advertiser.id;
+    const body = { ...req.body, advertiserId };
+    // Auto-compute commission amount from basisAmount × ratePct when the
+    // caller supplies both and omits an explicit amount override.
+    if ((body.payType === 'commission_livestream' || body.payType === 'commission_ugc_affiliate')
+      && body.basisAmount && body.ratePct && body.amount === undefined) {
+      body.amount = Number((Number(body.basisAmount) * Number(body.ratePct) / 100).toFixed(2));
+    }
+    const id = await savePayment(body);
+    res.json({ saved: true, id });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.patch('/payments/:id', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const { status, paidAt } = req.body || {};
+    if (!status) return res.status(400).json({ error: 'status is required' });
+    await updatePaymentStatus(Number(req.params.id), { status, paidAt });
+    res.json({ updated: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/payments/:id', async (req, res) => {
+  try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
+    const deleted = await deletePayment(Number(req.params.id));
+    res.json({ deleted });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Activity-type KPI (UGC / livestream / paid_boost split) ────────────────
+// Benchmarks here are fixed reference constants, not a live industry-data
+// feed — no such feed exists for this. Override via env if you have your own
+// agency/category benchmark figures to compare against instead.
+const ACTIVITY_BENCHMARKS = {
+  ugc: { roas: Number(process.env.BENCHMARK_UGC_ROAS) || 2.5 },
+  livestream: { roas: Number(process.env.BENCHMARK_LIVESTREAM_ROAS) || 3.0 },
+  paid_boost: { roas: Number(process.env.BENCHMARK_PAID_BOOST_ROAS) || 2.0 },
+};
+
+app.post('/campaigns/:id/activity-kpi', async (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    const ctx = await requireCampaignAccess(req, res, campaignId);
+    if (!ctx) return;
+    const { activityType, spend = 0, revenue = 0, gmv = 0, views = 0, clicks = 0, orders = 0, notes = '' } = req.body || {};
+    if (!activityType) return res.status(400).json({ error: 'activityType is required' });
+    const id = await saveActivityKpi({ campaignId, activityType, spend, revenue, gmv, views, clicks, orders, notes });
+    await logCampaignAudit({ campaignId, action: 'activity_kpi_saved', details: { activityType, spend, revenue, gmv } });
+    res.json({ saved: true, id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/campaigns/:id/activity-kpi', async (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    const ctx = await requireCampaignAccess(req, res, campaignId);
+    if (!ctx) return;
+    const history = await listActivityKpi(campaignId);
+    const summary = summarizeActivityKpi(history).map((s) => ({
+      ...s,
+      benchmarkRoas: ACTIVITY_BENCHMARKS[s.activityType]?.roas ?? null,
+    }));
+    res.json({ campaignId, history, summary, benchmarks: ACTIVITY_BENCHMARKS });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

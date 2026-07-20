@@ -180,6 +180,12 @@ async function initDb() {
       line_id TEXT,
       outreach_stage TEXT DEFAULT 'not_contacted',
       last_contacted_at TEXT,
+      partnership_type TEXT DEFAULT 'unset',
+      flat_fee REAL,
+      commission_livestream_pct REAL,
+      commission_ugc_affiliate_pct REAL,
+      payment_status TEXT DEFAULT 'unpaid',
+      payment_notes TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
@@ -192,6 +198,101 @@ async function initDb() {
   try { run('ALTER TABLE creator_sources ADD COLUMN line_id TEXT'); } catch (_) {}
   try { run("ALTER TABLE creator_sources ADD COLUMN outreach_stage TEXT DEFAULT 'not_contacted'"); } catch (_) {}
   try { run('ALTER TABLE creator_sources ADD COLUMN last_contacted_at TEXT'); } catch (_) {}
+  try { run("ALTER TABLE creator_sources ADD COLUMN partnership_type TEXT DEFAULT 'unset'"); } catch (_) {}
+  try { run('ALTER TABLE creator_sources ADD COLUMN flat_fee REAL'); } catch (_) {}
+  try { run('ALTER TABLE creator_sources ADD COLUMN commission_livestream_pct REAL'); } catch (_) {}
+  try { run('ALTER TABLE creator_sources ADD COLUMN commission_ugc_affiliate_pct REAL'); } catch (_) {}
+  try { run("ALTER TABLE creator_sources ADD COLUMN payment_status TEXT DEFAULT 'unpaid'"); } catch (_) {}
+  try { run('ALTER TABLE creator_sources ADD COLUMN payment_notes TEXT'); } catch (_) {}
+
+  // Creator activity calendar — UGC posts, livestreams, and paid-boost flights,
+  // one row per scheduled activity. This is the umbrella view everything else
+  // (deliverables, payments, activity KPI) hangs off of via calendar_entry_id.
+  run(`
+    CREATE TABLE IF NOT EXISTS creator_calendar_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      advertiser_id INTEGER,
+      campaign_id INTEGER,
+      creator_id INTEGER,
+      activity_type TEXT NOT NULL,
+      title TEXT,
+      sku TEXT,
+      platform TEXT,
+      scheduled_date TEXT,
+      scheduled_time TEXT,
+      status TEXT DEFAULT 'scheduled',
+      budget_allocated REAL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  run('CREATE INDEX IF NOT EXISTS idx_calendar_campaign ON creator_calendar_entries(campaign_id)');
+  run('CREATE INDEX IF NOT EXISTS idx_calendar_creator ON creator_calendar_entries(creator_id)');
+
+  // Proof-of-delivery submissions against a calendar entry.
+  run(`
+    CREATE TABLE IF NOT EXISTS creator_deliverables (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      calendar_entry_id INTEGER NOT NULL,
+      creator_id INTEGER,
+      submission_url TEXT,
+      submission_note TEXT,
+      status TEXT DEFAULT 'pending',
+      submitted_at TEXT,
+      reviewed_at TEXT,
+      reviewer_notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (calendar_entry_id) REFERENCES creator_calendar_entries(id)
+    )
+  `);
+  run('CREATE INDEX IF NOT EXISTS idx_deliverables_entry ON creator_deliverables(calendar_entry_id)');
+
+  // Creator payment ledger: flat fees, livestream-GMV commission, and UGC
+  // affiliate-sale commission all post here so budget utilisation and payout
+  // status can be tracked per creator per campaign.
+  run(`
+    CREATE TABLE IF NOT EXISTS creator_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      advertiser_id INTEGER,
+      campaign_id INTEGER,
+      creator_id INTEGER,
+      calendar_entry_id INTEGER,
+      pay_type TEXT NOT NULL,
+      basis_amount REAL DEFAULT 0,
+      rate_pct REAL,
+      amount REAL DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      scheduled_date TEXT,
+      paid_at TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  run('CREATE INDEX IF NOT EXISTS idx_payments_campaign ON creator_payments(campaign_id)');
+  run('CREATE INDEX IF NOT EXISTS idx_payments_creator ON creator_payments(creator_id)');
+
+  // Activity-level KPI split (UGC / livestream / paid_boost), distinct from the
+  // whole-campaign campaign_kpi_entries roll-up above.
+  run(`
+    CREATE TABLE IF NOT EXISTS campaign_activity_kpi (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL,
+      activity_type TEXT NOT NULL,
+      spend REAL DEFAULT 0,
+      revenue REAL DEFAULT 0,
+      gmv REAL DEFAULT 0,
+      views_count INTEGER DEFAULT 0,
+      clicks_count INTEGER DEFAULT 0,
+      orders_count INTEGER DEFAULT 0,
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+    )
+  `);
+  run('CREATE INDEX IF NOT EXISTS idx_activity_kpi_campaign ON campaign_activity_kpi(campaign_id)');
 
   run(`
     CREATE TABLE IF NOT EXISTS api_tokens (
@@ -536,6 +637,12 @@ function mapCreatorSource(r) {
     lineId: r.lineId || '',
     outreachStage: r.outreachStage || 'not_contacted',
     lastContactedAt: r.lastContactedAt || null,
+    partnershipType: r.partnershipType || 'unset',
+    flatFee: r.flatFee ?? null,
+    commissionLivestreamPct: r.commissionLivestreamPct ?? null,
+    commissionUgcAffiliatePct: r.commissionUgcAffiliatePct ?? null,
+    paymentStatus: r.paymentStatus || 'unpaid',
+    paymentNotes: r.paymentNotes || '',
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -546,6 +653,9 @@ const CREATOR_SOURCE_COLUMNS = `id, advertiser_id AS advertiserId, name, platfor
   verify_http AS verifyHttp, verified_at AS verifiedAt, tiktok_handle AS tiktokHandle,
   instagram_handle AS instagramHandle, meta_handle AS metaHandle, line_id AS lineId,
   outreach_stage AS outreachStage, last_contacted_at AS lastContactedAt,
+  partnership_type AS partnershipType, flat_fee AS flatFee,
+  commission_livestream_pct AS commissionLivestreamPct, commission_ugc_affiliate_pct AS commissionUgcAffiliatePct,
+  payment_status AS paymentStatus, payment_notes AS paymentNotes,
   created_at AS createdAt, updated_at AS updatedAt`;
 
 async function saveCreatorSource(payload) {
@@ -563,12 +673,17 @@ async function saveCreatorSource(payload) {
       `UPDATE creator_sources
        SET name = ?, platform = ?, handle = ?, profile_url = ?, followers = ?, tier = ?,
            rate_note = ?, niche = ?, notes = ?, source = ?, tiktok_handle = ?, instagram_handle = ?,
-           meta_handle = ?, line_id = ?, outreach_stage = ?, last_contacted_at = ?, updated_at = CURRENT_TIMESTAMP
+           meta_handle = ?, line_id = ?, outreach_stage = ?, last_contacted_at = ?,
+           partnership_type = ?, flat_fee = ?, commission_livestream_pct = ?, commission_ugc_affiliate_pct = ?,
+           payment_status = ?, payment_notes = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [merged.name, merged.platform, merged.handle || '', merged.profileUrl, merged.followers || 0, merged.tier || '',
         merged.rateNote || '', merged.niche || '', merged.notes || '', merged.source || 'manual',
         merged.tiktokHandle || '', merged.instagramHandle || '', merged.metaHandle || '', merged.lineId || '',
-        merged.outreachStage || 'not_contacted', merged.lastContactedAt || null, payload.id]
+        merged.outreachStage || 'not_contacted', merged.lastContactedAt || null,
+        merged.partnershipType || 'unset', merged.flatFee ?? null, merged.commissionLivestreamPct ?? null,
+        merged.commissionUgcAffiliatePct ?? null, merged.paymentStatus || 'unpaid', merged.paymentNotes || '',
+        payload.id]
     );
     persistDb();
     return Number(payload.id);
@@ -577,6 +692,8 @@ async function saveCreatorSource(payload) {
     advertiserId, name, platform, handle, profileUrl,
     followers = 0, tier = '', rateNote = '', niche = '', notes = '', source = 'manual',
     tiktokHandle = '', instagramHandle = '', metaHandle = '', lineId = '',
+    partnershipType = 'unset', flatFee = null, commissionLivestreamPct = null, commissionUgcAffiliatePct = null,
+    paymentStatus = 'unpaid', paymentNotes = '',
   } = payload;
   if (!name || !platform || !profileUrl) {
     throw new Error('name, platform, and profileUrl are required');
@@ -591,17 +708,23 @@ async function saveCreatorSource(payload) {
   run(
     `INSERT INTO creator_sources
       (advertiser_id, name, platform, handle, profile_url, followers, tier, rate_note, niche, notes, source,
-       tiktok_handle, instagram_handle, meta_handle, line_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       tiktok_handle, instagram_handle, meta_handle, line_id,
+       partnership_type, flat_fee, commission_livestream_pct, commission_ugc_affiliate_pct, payment_status, payment_notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(advertiser_id, profile_url) DO UPDATE SET
        name = excluded.name, platform = excluded.platform, handle = excluded.handle,
        followers = excluded.followers, tier = excluded.tier, rate_note = excluded.rate_note,
        niche = excluded.niche, notes = excluded.notes, source = excluded.source,
        tiktok_handle = excluded.tiktok_handle, instagram_handle = excluded.instagram_handle,
        meta_handle = excluded.meta_handle, line_id = excluded.line_id,
+       partnership_type = excluded.partnership_type, flat_fee = excluded.flat_fee,
+       commission_livestream_pct = excluded.commission_livestream_pct,
+       commission_ugc_affiliate_pct = excluded.commission_ugc_affiliate_pct,
+       payment_status = excluded.payment_status, payment_notes = excluded.payment_notes,
        updated_at = CURRENT_TIMESTAMP`,
     [advKey, name, platform, handle || '', profileUrl, followers, tier, rateNote, niche, notes, source,
-      tiktokHandle, instagramHandle, metaHandle, lineId]
+      tiktokHandle, instagramHandle, metaHandle, lineId,
+      partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct, paymentStatus, paymentNotes]
   );
   persistDb();
   const row = get(
@@ -609,6 +732,52 @@ async function saveCreatorSource(payload) {
     [profileUrl, advKey]
   );
   return row ? row.id : null;
+}
+
+// Bulk-loads creator rows (e.g. from a CSV upload) instead of one POST per
+// creator. Each row goes through the same validation/upsert as saveCreatorSource
+// so a bad row is reported, not silently dropped or allowed to corrupt the batch.
+async function bulkImportCreatorSources(items, advertiserId) {
+  const results = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const row = items[i];
+    try {
+      const id = await saveCreatorSource({ ...row, advertiserId });
+      results.push({ row: i, ok: true, id, name: row.name });
+    } catch (e) {
+      results.push({ row: i, ok: false, error: e.message, name: row?.name });
+    }
+  }
+  return {
+    imported: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    results,
+  };
+}
+
+// Search across the creator library. LIKE-based, case-insensitive via COLLATE
+// NOCASE on TEXT columns — fine at this table's expected scale, not meant for
+// full-text search at very large volumes.
+async function searchCreatorSources({ advertiserId = null, q = '', partnershipType = '', outreachStage = '' } = {}) {
+  const clauses = [];
+  const params = [];
+  if (advertiserId) { clauses.push('advertiser_id = ?'); params.push(advertiserId); }
+  if (partnershipType) { clauses.push('partnership_type = ?'); params.push(partnershipType); }
+  if (outreachStage) { clauses.push('outreach_stage = ?'); params.push(outreachStage); }
+  if (q) {
+    const like = `%${q}%`;
+    clauses.push(`(
+      name LIKE ? COLLATE NOCASE OR handle LIKE ? COLLATE NOCASE OR platform LIKE ? COLLATE NOCASE OR
+      tier LIKE ? COLLATE NOCASE OR niche LIKE ? COLLATE NOCASE OR notes LIKE ? COLLATE NOCASE OR
+      rate_note LIKE ? COLLATE NOCASE OR tiktok_handle LIKE ? COLLATE NOCASE OR instagram_handle LIKE ? COLLATE NOCASE
+    )`);
+    params.push(like, like, like, like, like, like, like, like, like);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  return all(
+    `SELECT ${CREATOR_SOURCE_COLUMNS} FROM creator_sources ${where} ORDER BY updated_at DESC LIMIT 200`,
+    params
+  ).map(mapCreatorSource);
 }
 
 async function listCreatorSources(advertiserId = null) {
@@ -641,6 +810,269 @@ async function updateCreatorSourceVerification(id, { status, http, verifiedAt })
     [status, http ?? null, verifiedAt, id]
   );
   persistDb();
+}
+
+// ── Creator activity calendar (UGC / livestream / paid_boost) ──────────────
+const CALENDAR_COLUMNS = `id, advertiser_id AS advertiserId, campaign_id AS campaignId, creator_id AS creatorId,
+  activity_type AS activityType, title, sku, platform, scheduled_date AS scheduledDate,
+  scheduled_time AS scheduledTime, status, budget_allocated AS budgetAllocated, notes,
+  created_at AS createdAt, updated_at AS updatedAt`;
+
+function mapCalendarEntry(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    advertiserId: r.advertiserId || null,
+    campaignId: r.campaignId || null,
+    creatorId: r.creatorId || null,
+    activityType: r.activityType,
+    title: r.title || '',
+    sku: r.sku || '',
+    platform: r.platform || '',
+    scheduledDate: r.scheduledDate || null,
+    scheduledTime: r.scheduledTime || '',
+    status: r.status || 'scheduled',
+    budgetAllocated: Number(r.budgetAllocated || 0),
+    notes: r.notes || '',
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+async function saveCalendarEntry(payload) {
+  const {
+    id, advertiserId, campaignId, creatorId, activityType, title = '', sku = '',
+    platform = '', scheduledDate = null, scheduledTime = '', status = 'scheduled',
+    budgetAllocated = 0, notes = '',
+  } = payload;
+  if (!activityType) throw new Error('activityType is required');
+  if (id) {
+    run(
+      `UPDATE creator_calendar_entries
+       SET campaign_id = ?, creator_id = ?, activity_type = ?, title = ?, sku = ?, platform = ?,
+           scheduled_date = ?, scheduled_time = ?, status = ?, budget_allocated = ?, notes = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [campaignId || null, creatorId || null, activityType, title, sku, platform,
+        scheduledDate, scheduledTime, status, budgetAllocated, notes, id]
+    );
+    persistDb();
+    return Number(id);
+  }
+  const created = run(
+    `INSERT INTO creator_calendar_entries
+      (advertiser_id, campaign_id, creator_id, activity_type, title, sku, platform, scheduled_date, scheduled_time, status, budget_allocated, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [advertiserId || null, campaignId || null, creatorId || null, activityType, title, sku, platform,
+      scheduledDate, scheduledTime, status, budgetAllocated, notes]
+  );
+  persistDb();
+  return created.lastID;
+}
+
+async function listCalendarEntries({ campaignId = null, advertiserId = null } = {}) {
+  const clauses = [];
+  const params = [];
+  if (campaignId) { clauses.push('campaign_id = ?'); params.push(campaignId); }
+  if (advertiserId) { clauses.push('advertiser_id = ?'); params.push(advertiserId); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  return all(
+    `SELECT ${CALENDAR_COLUMNS} FROM creator_calendar_entries ${where} ORDER BY scheduled_date ASC, id ASC`,
+    params
+  ).map(mapCalendarEntry);
+}
+
+async function deleteCalendarEntry(id) {
+  run('DELETE FROM creator_deliverables WHERE calendar_entry_id = ?', [id]);
+  const res = run('DELETE FROM creator_calendar_entries WHERE id = ?', [id]);
+  persistDb();
+  return res.changes > 0;
+}
+
+// ── Proof-of-delivery submissions ───────────────────────────────────────────
+const DELIVERABLE_COLUMNS = `id, calendar_entry_id AS calendarEntryId, creator_id AS creatorId,
+  submission_url AS submissionUrl, submission_note AS submissionNote, status,
+  submitted_at AS submittedAt, reviewed_at AS reviewedAt, reviewer_notes AS reviewerNotes,
+  created_at AS createdAt, updated_at AS updatedAt`;
+
+function mapDeliverable(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    calendarEntryId: r.calendarEntryId,
+    creatorId: r.creatorId || null,
+    submissionUrl: r.submissionUrl || '',
+    submissionNote: r.submissionNote || '',
+    status: r.status || 'pending',
+    submittedAt: r.submittedAt || null,
+    reviewedAt: r.reviewedAt || null,
+    reviewerNotes: r.reviewerNotes || '',
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+async function saveDeliverable(payload) {
+  const { calendarEntryId, creatorId, submissionUrl = '', submissionNote = '' } = payload;
+  if (!calendarEntryId) throw new Error('calendarEntryId is required');
+  const created = run(
+    `INSERT INTO creator_deliverables (calendar_entry_id, creator_id, submission_url, submission_note, status, submitted_at)
+     VALUES (?, ?, ?, ?, 'submitted', CURRENT_TIMESTAMP)`,
+    [calendarEntryId, creatorId || null, submissionUrl, submissionNote]
+  );
+  run(`UPDATE creator_calendar_entries SET status = 'delivered', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [calendarEntryId]);
+  persistDb();
+  return created.lastID;
+}
+
+const DELIVERABLE_COLUMNS_JOINED = `d.id, d.calendar_entry_id AS calendarEntryId, d.creator_id AS creatorId,
+  d.submission_url AS submissionUrl, d.submission_note AS submissionNote, d.status,
+  d.submitted_at AS submittedAt, d.reviewed_at AS reviewedAt, d.reviewer_notes AS reviewerNotes,
+  d.created_at AS createdAt, d.updated_at AS updatedAt`;
+
+async function listDeliverables({ calendarEntryId = null, campaignId = null } = {}) {
+  if (campaignId) {
+    return all(
+      `SELECT ${DELIVERABLE_COLUMNS_JOINED}
+       FROM creator_deliverables d
+       JOIN creator_calendar_entries ce ON ce.id = d.calendar_entry_id
+       WHERE ce.campaign_id = ?
+       ORDER BY d.id DESC`,
+      [campaignId]
+    ).map(mapDeliverable);
+  }
+  const clauses = [];
+  const params = [];
+  if (calendarEntryId) { clauses.push('calendar_entry_id = ?'); params.push(calendarEntryId); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  return all(`SELECT ${DELIVERABLE_COLUMNS} FROM creator_deliverables ${where} ORDER BY id DESC`, params).map(mapDeliverable);
+}
+
+async function updateDeliverableStatus(id, { status, reviewerNotes = '' }) {
+  run(
+    `UPDATE creator_deliverables SET status = ?, reviewer_notes = ?, reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [status, reviewerNotes, id]
+  );
+  persistDb();
+}
+
+// ── Creator payment ledger (flat fee, livestream commission, UGC affiliate commission) ──
+const PAYMENT_COLUMNS = `id, advertiser_id AS advertiserId, campaign_id AS campaignId, creator_id AS creatorId,
+  calendar_entry_id AS calendarEntryId, pay_type AS payType, basis_amount AS basisAmount, rate_pct AS ratePct,
+  amount, status, scheduled_date AS scheduledDate, paid_at AS paidAt, notes,
+  created_at AS createdAt, updated_at AS updatedAt`;
+
+function mapPayment(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    advertiserId: r.advertiserId || null,
+    campaignId: r.campaignId || null,
+    creatorId: r.creatorId || null,
+    calendarEntryId: r.calendarEntryId || null,
+    payType: r.payType,
+    basisAmount: Number(r.basisAmount || 0),
+    ratePct: r.ratePct ?? null,
+    amount: Number(r.amount || 0),
+    status: r.status || 'pending',
+    scheduledDate: r.scheduledDate || null,
+    paidAt: r.paidAt || null,
+    notes: r.notes || '',
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+async function savePayment(payload) {
+  const {
+    id, advertiserId, campaignId, creatorId, calendarEntryId, payType,
+    basisAmount = 0, ratePct = null, amount = 0, status = 'pending',
+    scheduledDate = null, notes = '',
+  } = payload;
+  if (!payType) throw new Error('payType is required');
+  if (id) {
+    run(
+      `UPDATE creator_payments
+       SET campaign_id = ?, creator_id = ?, calendar_entry_id = ?, pay_type = ?, basis_amount = ?,
+           rate_pct = ?, amount = ?, status = ?, scheduled_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [campaignId || null, creatorId || null, calendarEntryId || null, payType, basisAmount, ratePct, amount, status, scheduledDate, notes, id]
+    );
+    persistDb();
+    return Number(id);
+  }
+  const created = run(
+    `INSERT INTO creator_payments
+      (advertiser_id, campaign_id, creator_id, calendar_entry_id, pay_type, basis_amount, rate_pct, amount, status, scheduled_date, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [advertiserId || null, campaignId || null, creatorId || null, calendarEntryId || null, payType, basisAmount, ratePct, amount, status, scheduledDate, notes]
+  );
+  persistDb();
+  return created.lastID;
+}
+
+async function listPayments({ campaignId = null, creatorId = null, advertiserId = null } = {}) {
+  const clauses = [];
+  const params = [];
+  if (campaignId) { clauses.push('campaign_id = ?'); params.push(campaignId); }
+  if (creatorId) { clauses.push('creator_id = ?'); params.push(creatorId); }
+  if (advertiserId) { clauses.push('advertiser_id = ?'); params.push(advertiserId); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  return all(`SELECT ${PAYMENT_COLUMNS} FROM creator_payments ${where} ORDER BY id DESC`, params).map(mapPayment);
+}
+
+async function updatePaymentStatus(id, { status, paidAt = null }) {
+  run(
+    `UPDATE creator_payments SET status = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [status, status === 'paid' ? (paidAt || new Date().toISOString()) : paidAt, id]
+  );
+  persistDb();
+}
+
+async function deletePayment(id) {
+  const res = run('DELETE FROM creator_payments WHERE id = ?', [id]);
+  persistDb();
+  return res.changes > 0;
+}
+
+// ── Activity-type KPI (UGC / livestream / paid_boost split) ────────────────
+async function saveActivityKpi({ campaignId, activityType, spend = 0, revenue = 0, gmv = 0, views = 0, clicks = 0, orders = 0, notes = '' }) {
+  const row = run(
+    `INSERT INTO campaign_activity_kpi
+      (campaign_id, activity_type, spend, revenue, gmv, views_count, clicks_count, orders_count, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [campaignId, activityType, spend, revenue, gmv, views, clicks, orders, notes]
+  );
+  persistDb();
+  return row.lastID;
+}
+
+async function listActivityKpi(campaignId) {
+  return all(
+    `SELECT id, campaign_id AS campaignId, activity_type AS activityType, spend, revenue, gmv,
+            views_count AS views, clicks_count AS clicks, orders_count AS orders, notes,
+            created_at AS createdAt
+     FROM campaign_activity_kpi WHERE campaign_id = ? ORDER BY id DESC`,
+    [campaignId]
+  );
+}
+
+function summarizeActivityKpi(rows) {
+  const byType = {};
+  rows.forEach((r) => {
+    const t = r.activityType;
+    if (!byType[t]) byType[t] = { activityType: t, spend: 0, revenue: 0, gmv: 0, views: 0, clicks: 0, orders: 0 };
+    byType[t].spend += Number(r.spend || 0);
+    byType[t].revenue += Number(r.revenue || 0);
+    byType[t].gmv += Number(r.gmv || 0);
+    byType[t].views += Number(r.views || 0);
+    byType[t].clicks += Number(r.clicks || 0);
+    byType[t].orders += Number(r.orders || 0);
+  });
+  return Object.values(byType).map((t) => ({
+    ...t,
+    roas: t.spend > 0 ? Number(((t.revenue + t.gmv) / t.spend).toFixed(4)) : null,
+  }));
 }
 
 // ── API token store (TikTok / Meta OAuth credentials) ──────────────────────
@@ -759,4 +1191,19 @@ module.exports = {
   getCreatorSourcesByIds,
   deleteCreatorSource,
   updateCreatorSourceVerification,
+  bulkImportCreatorSources,
+  searchCreatorSources,
+  saveCalendarEntry,
+  listCalendarEntries,
+  deleteCalendarEntry,
+  saveDeliverable,
+  listDeliverables,
+  updateDeliverableStatus,
+  savePayment,
+  listPayments,
+  updatePaymentStatus,
+  deletePayment,
+  saveActivityKpi,
+  listActivityKpi,
+  summarizeActivityKpi,
 };

@@ -184,6 +184,8 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
     <button class="rnode" id="rn-4" onclick="goStep(4)"><div class="rdot">$</div><div class="rlabel">Budget · KPI</div><div class="rlock" id="lk-4">🔒</div></button>
     <div class="rline" id="rl-4"></div>
     <button class="rnode" id="rn-5" onclick="goStep(5)"><div class="rdot">%</div><div class="rlabel">Pricing · Promo</div><div class="rlock" id="lk-5">🔒</div></button>
+    <div class="rline" id="rl-5"></div>
+    <button class="rnode" id="rn-6" onclick="goStep(6)"><div class="rdot">📅</div><div class="rlabel">Creator Calendar</div><div class="rlock" id="lk-6">🔒</div></button>
   </div>
 </div>
 
@@ -370,6 +372,18 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <div class="fld" style="margin:0"><label>Rate note</label><input id="cs-rate" placeholder="e.g. S$700-1,200, 2-3 posts"></div>
       <div class="fld" style="margin:0"><label>Niche / notes</label><input id="cs-notes" placeholder="e.g. K-beauty, 30-day skin diary format"></div>
     </div>
+    <div class="card-hd" style="margin-top:4px">Partnership type & commission <span style="font-weight:400;text-transform:none;letter-spacing:0">— how this creator is paid</span></div>
+    <div class="g4" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Partnership type</label><select id="cs-partnership" onchange="renderPartnershipFields()">
+        <option value="unset">— not set —</option>
+        <option value="gifting">Gifting only (product, no fee)</option>
+        <option value="paid">Paid (flat fee)</option>
+        <option value="commission">Commission-based</option>
+      </select></div>
+      <div class="fld" style="margin:0" id="cs-flat-fee-fld"><label>Flat fee (SGD)</label><input id="cs-flat-fee" type="number" min="0" placeholder="e.g. 1500"></div>
+      <div class="fld" style="margin:0" id="cs-comm-live-fld"><label>Commission % — livestream sales</label><input id="cs-comm-live" type="number" min="0" max="100" step="0.1" placeholder="e.g. 15"></div>
+      <div class="fld" style="margin:0" id="cs-comm-ugc-fld"><label>Commission % — UGC affiliate sales</label><input id="cs-comm-ugc" type="number" min="0" max="100" step="0.1" placeholder="e.g. 10"></div>
+    </div>
     <div class="card-hd" style="margin-top:4px">Contact directory <span style="font-weight:400;text-transform:none;letter-spacing:0">— any channel left blank just won't show a link</span></div>
     <div class="g4" style="gap:10px">
       <div class="fld" style="margin:0"><label>TikTok handle</label><input id="cs-ct-tiktok" placeholder="creatorhandle"></div>
@@ -384,8 +398,17 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <button class="btn btn-outline" onclick="seedStarterCreatorLibrary()">Load Starter List (unverified)</button>
       <button class="btn btn-outline" onclick="downloadContactReport()">⬇ Download Contact & Outreach Report</button>
     </div>
-    <div class="g2 mt" style="gap:10px">
-      <div class="fld" style="margin:0"><label>Filter library</label><input id="cs-filter" placeholder="Search name, handle, platform, tier..." oninput="renderCreatorLibrary()"></div>
+    <div class="card-hd" style="margin-top:10px">Bulk upload / download <span style="font-weight:400;text-transform:none;letter-spacing:0">— populate the whole library from a spreadsheet instead of one entry at a time</span></div>
+    <div style="font-size:11px;color:var(--sl);line-height:1.6;margin-bottom:6px">CSV columns: name, platform, handle, profileUrl, followers, tier, rateNote, niche, notes, tiktokHandle, instagramHandle, metaHandle, lineId, partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct. Only name/platform/profileUrl are required per row.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="file" id="cs-csv-file" accept=".csv" style="font-size:11px">
+      <button class="btn btn-outline" onclick="uploadCreatorCsv()">⬆ Upload CSV to Library</button>
+      <button class="btn btn-outline" onclick="downloadCreatorCsvTemplate()">⬇ Download blank template</button>
+      <button class="btn btn-outline" onclick="downloadCreatorLibraryCsv()">⬇ Export library as CSV</button>
+    </div>
+    <div id="cs-csv-msg" class="mt"></div>
+    <div class="g3 mt" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Search creator profiles</label><input id="cs-filter" placeholder="Search name, handle, platform, tier, niche..." oninput="renderCreatorLibrary()"></div>
       <div class="fld" style="margin:0"><label>Outreach stage</label><select id="cs-stage-filter" onchange="renderCreatorLibrary()">
         <option value="">All stages</option>
         <option value="not_contacted">Not contacted</option>
@@ -393,6 +416,17 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
         <option value="replied">Replied</option>
         <option value="confirmed">Confirmed</option>
       </select></div>
+      <div class="fld" style="margin:0"><label>Partnership type</label><select id="cs-partnership-filter" onchange="renderCreatorLibrary()">
+        <option value="">All types</option>
+        <option value="gifting">Gifting only</option>
+        <option value="paid">Paid</option>
+        <option value="commission">Commission</option>
+        <option value="unset">Not set</option>
+      </select></div>
+    </div>
+    <div id="cs-search-all-wrap" style="display:none" class="mt">
+      <button class="btn btn-outline" onclick="searchAllAdvertisers()">🔍 Search across every advertiser (super admin)</button>
+      <div id="cs-search-all-result" class="mt"></div>
     </div>
     <div id="cs-msg" class="mt"></div>
     <div id="cs-library" class="mt"></div>
@@ -675,6 +709,115 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
     <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:8px">Uses the promo periods selected in Setup, your SKU floors above, and the review-gate rule to recommend which SKUs/bundles to discount, at what depth, on which promo mechanism — instead of generic advice.</div>
     <button class="btn btn-gold" onclick="buildPricingStrategy()">Generate AI Pricing & Bundle Strategy →</button>
     <div id="pricing-ai-output" class="mt"></div>
+  </div>
+</div>
+
+<!-- ════════ STEP 6: CREATOR CALENDAR ════════ -->
+<div class="pg" id="pg-6">
+  <div class="stitle">Creator Calendar — UGC, Livestream & Paid Boost</div>
+  <div class="ib ibsk mb2"><div class="ibl" style="color:var(--sk)">Scope</div><div class="ibb">This section covers creator-facing activity only — scheduled UGC posts, livestreams, and paid boost of creator content — plus the budget/payment ledger and ROI reporting tied to those activities. It reads from the current campaign (save a campaign in Setup first) and the Creator Sources Library above.</div></div>
+
+  <div class="card mb2">
+    <div class="card-hd">Schedule an activity</div>
+    <div class="g4" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Creator (from library)</label><select id="cal-creator"><option value="">— select —</option></select></div>
+      <div class="fld" style="margin:0"><label>Activity type</label><select id="cal-type" onchange="renderCalendarTypeFields()">
+        <option value="ugc">UGC post</option>
+        <option value="livestream">Livestream</option>
+        <option value="paid_boost">Paid boost</option>
+      </select></div>
+      <div class="fld" style="margin:0"><label>Platform</label><select id="cal-platform"><option>TikTok</option><option>Instagram</option><option>Facebook</option><option>Shopee</option></select></div>
+      <div class="fld" style="margin:0"><label>SKU / product</label><input id="cal-sku" placeholder="e.g. Vitamin C Ampoule"></div>
+    </div>
+    <div class="g4" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Title / notes</label><input id="cal-title" placeholder="e.g. Unboxing + routine demo"></div>
+      <div class="fld" style="margin:0"><label>Scheduled date</label><input id="cal-date" type="date"></div>
+      <div class="fld" style="margin:0"><label id="cal-time-label">Scheduled time (livestream)</label><input id="cal-time" type="time"></div>
+      <div class="fld" style="margin:0"><label>Budget allocated (SGD)</label><input id="cal-budget" type="number" min="0"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold" onclick="addCalendarEntry()">+ Add to Calendar</button>
+      <button class="btn btn-outline" onclick="loadCalendarEntries()">Refresh Calendar</button>
+    </div>
+    <div id="cal-msg" class="mt"></div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">Calendar overview <span style="font-weight:400;text-transform:none;letter-spacing:0">— filter by month and activity type</span></div>
+    <div class="g3" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Month</label><input id="cal-month-filter" type="month" oninput="renderCalendarEntries()"></div>
+      <div class="fld" style="margin:0"><label>Activity type</label><select id="cal-type-filter" onchange="renderCalendarEntries()">
+        <option value="">All types</option>
+        <option value="ugc">UGC post</option>
+        <option value="livestream">Livestream</option>
+        <option value="paid_boost">Paid boost</option>
+      </select></div>
+      <div class="fld" style="margin:0"><label>Status</label><select id="cal-status-filter" onchange="renderCalendarEntries()">
+        <option value="">All statuses</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="delivered">Delivered</option>
+        <option value="overdue">Overdue</option>
+        <option value="cancelled">Cancelled</option>
+      </select></div>
+    </div>
+    <div id="cal-summary" class="g4 mb2" style="margin-top:10px"></div>
+    <div id="cal-list"></div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">Proof of delivery <span style="font-weight:400;text-transform:none;letter-spacing:0">— creator submits a link once the activity is live</span></div>
+    <div class="g3" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Calendar entry</label><select id="deliv-entry"><option value="">— select a scheduled activity —</option></select></div>
+      <div class="fld" style="margin:0"><label>Submission URL</label><input id="deliv-url" placeholder="https://www.tiktok.com/@creator/video/..."></div>
+      <div class="fld" style="margin:0"><label>Note</label><input id="deliv-note" placeholder="e.g. posted 2 days late, screenshot on file"></div>
+    </div>
+    <button class="btn btn-outline" onclick="submitDeliverable()">Submit Proof of Delivery</button>
+    <div id="deliv-msg" class="mt"></div>
+    <div id="deliv-list" class="mt"></div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">Budget utilisation & creator payment ledger</div>
+    <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:8px">Log a payment against a creator — flat fee, gifting (no cost), or commission. Commission amount auto-calculates from the basis amount × the creator's commission rate when both are supplied.</div>
+    <div class="g4" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Creator</label><select id="pay-creator" onchange="prefillPaymentRate()"><option value="">— select —</option></select></div>
+      <div class="fld" style="margin:0"><label>Payment type</label><select id="pay-type" onchange="prefillPaymentRate()">
+        <option value="flat">Flat fee</option>
+        <option value="gifting">Gifting (product only)</option>
+        <option value="commission_livestream">Commission — livestream sales</option>
+        <option value="commission_ugc_affiliate">Commission — UGC affiliate sales</option>
+      </select></div>
+      <div class="fld" style="margin:0"><label>Basis amount (SGD sales/GMV) — commission only</label><input id="pay-basis" type="number" min="0"></div>
+      <div class="fld" style="margin:0"><label>Rate % — commission only</label><input id="pay-rate" type="number" min="0" max="100" step="0.1"></div>
+    </div>
+    <div class="g3" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Amount (SGD) — flat/gifting, or override</label><input id="pay-amount" type="number" min="0"></div>
+      <div class="fld" style="margin:0"><label>Scheduled date</label><input id="pay-date" type="date"></div>
+      <div class="fld" style="margin:0"><label>Notes</label><input id="pay-notes" placeholder="optional"></div>
+    </div>
+    <button class="btn btn-gold" onclick="addPayment()">+ Log Payment</button>
+    <div id="pay-msg" class="mt"></div>
+    <div id="pay-summary" class="g4 mb2" style="margin-top:10px"></div>
+    <div id="pay-list"></div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">Activity ROI — UGC vs. livestream vs. paid boost, vs. benchmark</div>
+    <div class="g4" style="gap:10px">
+      <div class="fld" style="margin:0"><label>Activity type</label><select id="akpi-type">
+        <option value="ugc">UGC</option>
+        <option value="livestream">Livestream</option>
+        <option value="paid_boost">Paid boost</option>
+      </select></div>
+      <div class="fld" style="margin:0"><label>Spend (SGD)</label><input id="akpi-spend" type="number" min="0"></div>
+      <div class="fld" style="margin:0"><label>Revenue (SGD)</label><input id="akpi-revenue" type="number" min="0"></div>
+      <div class="fld" style="margin:0"><label>GMV — livestream (SGD)</label><input id="akpi-gmv" type="number" min="0"></div>
+    </div>
+    <button class="btn btn-outline" onclick="addActivityKpi()">+ Log Activity KPI Entry</button>
+    <div id="akpi-msg" class="mt"></div>
+    <div id="akpi-table" class="mt"></div>
+    <div style="font-size:10.5px;color:var(--ms);margin-top:6px">Benchmark ROAS figures (UGC 2.5×, livestream 3.0×, paid boost 2.0×) are fixed reference constants set for this deployment, not a live industry-data feed — override via BENCHMARK_UGC_ROAS / BENCHMARK_LIVESTREAM_ROAS / BENCHMARK_PAID_BOOST_ROAS in the backend environment if you have your own figures.</div>
   </div>
 </div>
 
@@ -1013,6 +1156,8 @@ function renderRolePill(){
   const pill = document.getElementById('role-pill');
   pill.style.display = '';
   pill.textContent = AUTH.role === 'superadmin' ? 'SUPER ADMIN · All advertisers' : `Advertiser access · ${AUTH.advertiser?.brand || ''}`;
+  const searchAllWrap = document.getElementById('cs-search-all-wrap');
+  if(searchAllWrap) searchAllWrap.style.display = AUTH.role === 'superadmin' ? '' : 'none';
 }
 
 // ═══ ADVERTISERS ═══
@@ -1240,20 +1385,21 @@ HARD RULES:
 - Verdict before evidence. No em-dashes. SGD. Concise.`;
 
 // ═══ RAIL / NAV ═══
-let unlocked = [true,false,false,false,false,false];
+let unlocked = [true,false,false,false,false,false,false];
 function goStep(n){
   if(!unlocked[n]){ alert('Complete Setup first to unlock this step.'); return; }
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.getElementById('pg-'+n).classList.add('on');
-  for(let i=0;i<6;i++){
+  for(let i=0;i<7;i++){
     const node=document.getElementById('rn-'+i);
     node.classList.toggle('on',i===n);
   }
   if(n===5){ renderPricingTable(); renderPromoPlaybook(); }
+  if(n===6){ loadCalendarEntries(); loadDeliverables(); loadPayments(); loadActivityKpi(); }
 }
 function unlockAll(){
-  unlocked=[true,true,true,true,true,true];
-  for(let i=1;i<6;i++){ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=''; }
+  unlocked=[true,true,true,true,true,true,true];
+  for(let i=1;i<7;i++){ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=''; }
   document.getElementById('rn-0').classList.add('done');
   document.getElementById('rl-0').classList.add('done');
   renderPromoPlaybook();
@@ -1261,14 +1407,14 @@ function unlockAll(){
 }
 
 function relockPipeline(){
-  unlocked=[true,false,false,false,false,false];
-  for(let i=0;i<6;i++){
+  unlocked=[true,false,false,false,false,false,false];
+  for(let i=0;i<7;i++){
     const node=document.getElementById('rn-'+i);
     node.classList.remove('done');
     node.classList.toggle('on', i===0);
   }
-  for(let i=0;i<5;i++){ const rl=document.getElementById('rl-'+i); if(rl) rl.classList.remove('done'); }
-  const locks={1:'🔒 setup first',2:'🔒',3:'🔒',4:'🔒',5:'🔒'};
+  for(let i=0;i<6;i++){ const rl=document.getElementById('rl-'+i); if(rl) rl.classList.remove('done'); }
+  const locks={1:'🔒 setup first',2:'🔒',3:'🔒',4:'🔒',5:'🔒',6:'🔒'};
   Object.keys(locks).forEach((i)=>{ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=locks[i]; });
 }
 
@@ -1301,7 +1447,7 @@ function resetWorkspaceState(){
   document.getElementById('c-sku').innerHTML='';
   ['creators-output','content-output','schedule-output','queue-output','verify-output','rec-output',
    'kpi-output','kpi-history','audit-output','setup-msg','manual-kol-msg','kpi-msg','connection-msg',
-   'cs-msg','pricing-ai-output','msg-status'].forEach((id)=>{
+   'cs-msg','pricing-ai-output','msg-status','cal-msg','deliv-msg','pay-msg','akpi-msg'].forEach((id)=>{
     const el=document.getElementById(id); if(el) el.innerHTML='';
   });
   const bv=document.getElementById('budget-view');
@@ -1310,10 +1456,12 @@ function resetWorkspaceState(){
   document.getElementById('floor-echo').textContent='70';
   restorePricingState(null);
   CREATOR_LIBRARY=[];
+  CALENDAR_ENTRIES=[]; DELIVERABLES=[]; PAYMENTS=[];
   renderCreatorLibrary();
   renderManualCreatorList();
   renderBriefBudgetEcho();
   renderBriefQuality();
+  renderCalendarEntries();
   relockPipeline();
   goStep(0);
 }
@@ -1794,19 +1942,36 @@ function stageSelectHtml(c){
   const opts = Object.entries(STAGE_LABELS).map(([v,l])=>`<option value="${v}" ${c.outreachStage===v?'selected':''}>${l}</option>`).join('');
   return `<select onchange="updateCreatorStage(${c.id}, this.value)" style="font-size:10.5px;padding:4px 6px;border:1px solid var(--bd2);border-radius:6px;width:100%">${opts}</select>`;
 }
+const PARTNERSHIP_LABELS = {unset:'Not set', gifting:'Gifting only', paid:'Paid', commission:'Commission'};
+function partnershipTag(c){
+  const t = c.partnershipType || 'unset';
+  const cls = t==='commission' ? 'tS' : t==='paid' ? 'tB' : t==='gifting' ? 'tG' : 'tR';
+  let detail = '';
+  if(t==='paid' && c.flatFee) detail = ` S$${Number(c.flatFee).toLocaleString()}`;
+  if(t==='commission'){
+    const parts=[];
+    if(c.commissionLivestreamPct!=null && c.commissionLivestreamPct!=='') parts.push(`LIVE ${c.commissionLivestreamPct}%`);
+    if(c.commissionUgcAffiliatePct!=null && c.commissionUgcAffiliatePct!=='') parts.push(`UGC ${c.commissionUgcAffiliatePct}%`);
+    if(parts.length) detail = ' '+parts.join(' · ');
+  }
+  return `<span class="tag ${cls}">${PARTNERSHIP_LABELS[t]||t}</span>${detail?`<div style="font-size:9.5px;color:var(--ms);margin-top:2px">${detail}</div>`:''}`;
+}
 function renderCreatorLibrary(){
   const host = document.getElementById('cs-library');
   if(!host) return;
   const filter = (document.getElementById('cs-filter')?.value || '').toLowerCase();
   const stageFilter = document.getElementById('cs-stage-filter')?.value || '';
+  const partnershipFilter = document.getElementById('cs-partnership-filter')?.value || '';
   const items = CREATOR_LIBRARY.filter(c => {
     if(stageFilter && (c.outreachStage||'not_contacted') !== stageFilter) return false;
-    return !filter || [c.name,c.handle,c.platform,c.tier,c.niche].join(' ').toLowerCase().includes(filter);
+    if(partnershipFilter && (c.partnershipType||'unset') !== partnershipFilter) return false;
+    return !filter || [c.name,c.handle,c.platform,c.tier,c.niche,c.rateNote,c.tiktokHandle,c.instagramHandle].join(' ').toLowerCase().includes(filter);
   });
   populateMessageCreatorSelect();
   renderMessageTemplate();
+  populateCalendarCreatorSelects();
   if(!items.length){
-    host.innerHTML = `<div class="empty"><h4>Library empty${filter||stageFilter?' for this filter':''}</h4><p>Save a creator above, or click "Load Starter List" to seed creators referenced in prior d.nuvo planning docs (flagged unverified until you re-check them).</p></div>`;
+    host.innerHTML = `<div class="empty"><h4>Library empty${filter||stageFilter||partnershipFilter?' for this filter':''}</h4><p>Save a creator above, upload a CSV, or click "Load Starter List" to seed creators referenced in prior d.nuvo planning docs (flagged unverified until you re-check them).</p></div>`;
     return;
   }
   const rows = items.map(c => `
@@ -1816,6 +1981,7 @@ function renderCreatorLibrary(){
       <td>${c.followers ? Number(c.followers).toLocaleString() : 'n/a'}</td>
       <td>${c.tier || '—'}</td>
       <td>${c.rateNote || '—'}</td>
+      <td>${partnershipTag(c)}</td>
       <td>${contactLinksHtml(c)}</td>
       <td>${stageSelectHtml(c)}</td>
       <td>${verdictTag(c.verifyStatus)}${c.verifiedAt?`<div style="font-size:9px;color:var(--ms);margin-top:2px">${new Date(c.verifiedAt).toLocaleDateString()}</div>`:''}</td>
@@ -1825,7 +1991,7 @@ function renderCreatorLibrary(){
         <button class="btn btn-outline btn-sm" onclick="deleteLibraryCreator(${c.id})">Remove</button>
       </td>
     </tr>`).join('');
-  host.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>Rate</th><th>Contact</th><th>Stage</th><th>Verify</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+  host.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>Rate</th><th>Partnership</th><th>Contact</th><th>Stage</th><th>Verify</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 async function saveCreatorToLibrary(payload){
@@ -1833,6 +1999,16 @@ async function saveCreatorToLibrary(payload){
   const body = { ...payload, advertiserId: adv?.id };
   const data = await api('/creator-sources', { method:'POST', body });
   return data.item;
+}
+
+// Shows only the pay fields relevant to the selected partnership type —
+// gifting has no fee, paid has a flat fee, commission has the two rate inputs.
+function renderPartnershipFields(){
+  const type = document.getElementById('cs-partnership')?.value || 'unset';
+  const show = (id, on) => { const el=document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
+  show('cs-flat-fee-fld', type==='paid');
+  show('cs-comm-live-fld', type==='commission');
+  show('cs-comm-ugc-fld', type==='commission');
 }
 
 async function updateCreatorStage(id, stage){
@@ -1860,13 +2036,19 @@ async function addCreatorToLibrary(){
   const instagramHandle = document.getElementById('cs-ct-ig').value.trim().replace(/^@/,'');
   const metaHandle = document.getElementById('cs-ct-meta').value.trim().replace(/^@/,'');
   const lineId = document.getElementById('cs-ct-line').value.trim().replace(/^@/,'');
+  const partnershipType = document.getElementById('cs-partnership').value;
+  const flatFee = document.getElementById('cs-flat-fee').value ? +document.getElementById('cs-flat-fee').value : null;
+  const commissionLivestreamPct = document.getElementById('cs-comm-live').value ? +document.getElementById('cs-comm-live').value : null;
+  const commissionUgcAffiliatePct = document.getElementById('cs-comm-ugc').value ? +document.getElementById('cs-comm-ugc').value : null;
   if(!name || !platform || !profileUrl){
     msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Incomplete</div><div class="ibb">Name, platform, and profile URL are required.</div></div>`;
     return;
   }
   try{
-    await saveCreatorToLibrary({ name, platform, handle, profileUrl, followers, tier, rateNote, niche:notes, notes, source:'manual', tiktokHandle, instagramHandle, metaHandle, lineId });
-    ['cs-name','cs-handle','cs-url','cs-followers','cs-rate','cs-notes','cs-ct-tiktok','cs-ct-ig','cs-ct-meta','cs-ct-line'].forEach(id=>document.getElementById(id).value='');
+    await saveCreatorToLibrary({ name, platform, handle, profileUrl, followers, tier, rateNote, niche:notes, notes, source:'manual', tiktokHandle, instagramHandle, metaHandle, lineId, partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct });
+    ['cs-name','cs-handle','cs-url','cs-followers','cs-rate','cs-notes','cs-ct-tiktok','cs-ct-ig','cs-ct-meta','cs-ct-line','cs-flat-fee','cs-comm-live','cs-comm-ugc'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('cs-partnership').value = 'unset';
+    renderPartnershipFields();
     msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Saved to library</div><div class="ibb">Now available for every future campaign under this advertiser.</div></div>`;
     await loadCreatorLibrary();
   }catch(e){
@@ -1906,6 +2088,112 @@ async function deleteLibraryCreator(id){
   if(!confirm('Remove this creator from the library? This does not affect any campaign that already used it.')) return;
   await api('/creator-sources/'+id, { method:'DELETE' });
   await loadCreatorLibrary();
+}
+
+// ═══ BULK UPLOAD / DOWNLOAD — populate the library from a spreadsheet ═══
+const CREATOR_CSV_FIELDS = ['name','platform','handle','profileUrl','followers','tier','rateNote','niche','notes',
+  'tiktokHandle','instagramHandle','metaHandle','lineId','partnershipType','flatFee','commissionLivestreamPct','commissionUgcAffiliatePct'];
+
+// Minimal RFC4180-ish CSV parser: handles quoted fields with embedded commas/newlines/escaped quotes.
+function parseCsv(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const ch = text[i], next = text[i+1];
+    if(inQuotes){
+      if(ch === '"' && next === '"'){ field += '"'; i++; }
+      else if(ch === '"'){ inQuotes = false; }
+      else field += ch;
+    } else {
+      if(ch === '"') inQuotes = true;
+      else if(ch === ','){ row.push(field); field = ''; }
+      else if(ch === '\n' || ch === '\r'){
+        if(ch === '\r' && next === '\n') i++;
+        row.push(field); field='';
+        if(row.length>1 || row[0]!=='') rows.push(row);
+        row = [];
+      } else field += ch;
+    }
+  }
+  if(field!=='' || row.length){ row.push(field); rows.push(row); }
+  if(!rows.length) return [];
+  const headers = rows[0].map(h=>h.trim());
+  return rows.slice(1).filter(r=>r.some(v=>v.trim()!=='')).map(r=>{
+    const obj = {};
+    headers.forEach((h,i)=>{ obj[h] = (r[i]||'').trim(); });
+    return obj;
+  });
+}
+
+function downloadBlob(content, filename, mime){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type: mime}));
+  a.download = filename;
+  a.click();
+}
+
+function downloadCreatorCsvTemplate(){
+  const header = CREATOR_CSV_FIELDS.join(',');
+  const example = 'Dr Samuel GP,Instagram,drsamuelgp,https://www.instagram.com/drsamuelgp,50000,mid,"S$2,000-3,500",Clinical authority,2 posts + endorsement,drsamuelgp,drsamuelgp,,,commission,,15,10';
+  downloadBlob(header+'\n'+example+'\n', 'creator_sources_template.csv', 'text/csv');
+}
+
+async function downloadCreatorLibraryCsv(){
+  const adv = activeAdvertiser();
+  const q = adv?.id ? `?advertiserId=${adv.id}` : '';
+  const r = await fetch('/creator-sources/export'+q, { headers: { 'x-access-code': AUTH.code || '', 'x-client-id': CID } });
+  if(!r.ok){ alert('Export failed ('+r.status+')'); return; }
+  const text = await r.text();
+  downloadBlob(text, `creator_sources_${adv?.brand||'all'}_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
+}
+
+// Coerces the string cells a CSV parser hands back into the types
+// creator_sources actually expects (numbers where numbers are expected).
+function coerceCreatorRow(row){
+  const out = { ...row };
+  ['followers'].forEach(k=>{ if(out[k]!=='') out[k] = +out[k]||0; else delete out[k]; });
+  ['flatFee','commissionLivestreamPct','commissionUgcAffiliatePct'].forEach(k=>{
+    if(out[k]!==undefined && out[k]!=='') out[k] = +out[k]; else delete out[k];
+  });
+  Object.keys(out).forEach(k=>{ if(out[k]==='') delete out[k]; });
+  return out;
+}
+
+async function uploadCreatorCsv(){
+  const fileInput = document.getElementById('cs-csv-file');
+  const msg = document.getElementById('cs-csv-msg');
+  const file = fileInput?.files?.[0];
+  if(!file){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">No file selected</div><div class="ibb">Choose a CSV file first.</div></div>`; return; }
+  try{
+    const text = await file.text();
+    const rows = parseCsv(text).map(coerceCreatorRow);
+    if(!rows.length){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Empty file</div><div class="ibb">No data rows found in this CSV.</div></div>`; return; }
+    msg.innerHTML = `<div class="loading"><div class="spinner"></div><p>Uploading ${rows.length} row(s)...</p></div>`;
+    const adv = activeAdvertiser();
+    const data = await api('/creator-sources/bulk-import', { method:'POST', body:{ items: rows, advertiserId: adv?.id } });
+    const failedList = data.results.filter(r=>!r.ok).map(r=>`Row ${r.row+1} (${r.name||'unnamed'}): ${r.error}`).join('<br>');
+    msg.innerHTML = `<div class="ib ${data.failed?'ibg':'ibs'}"><div class="ibl" style="color:${data.failed?'#8A7000':'var(--sg)'}">Imported ${data.imported} of ${rows.length}</div><div class="ibb">${data.failed?`${data.failed} row(s) failed:<br>${failedList}`:'All rows loaded into the library.'}</div></div>`;
+    fileInput.value = '';
+    await loadCreatorLibrary();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Upload failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+// Super-admin-only: search the creator directory across every advertiser,
+// not just the one currently active — for cross-brand creator lookup.
+async function searchAllAdvertisers(){
+  const box = document.getElementById('cs-search-all-result');
+  const q = document.getElementById('cs-filter')?.value.trim() || '';
+  box.innerHTML = `<div class="loading"><div class="spinner"></div><p>Searching all advertisers...</p></div>`;
+  try{
+    const data = await api('/creator-sources/search'+(q?`?q=${encodeURIComponent(q)}`:''));
+    if(!data.items.length){ box.innerHTML = `<div class="empty"><h4>No matches</h4><p>No creator across any advertiser matched "${q}".</p></div>`; return; }
+    const rows = data.items.map(c=>`<tr><td>${c.name}</td><td>${c.platform}${c.handle?' · @'+c.handle:''}</td><td>${c.advertiserId||'—'}</td><td>${partnershipTag(c)}</td><td>${c.rateNote||'—'}</td></tr>`).join('');
+    box.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Advertiser ID</th><th>Partnership</th><th>Rate</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){
+    box.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Search failed</div><div class="ibb">${e.message}</div></div>`;
+  }
 }
 
 // ═══ OUTREACH MESSAGE TEMPLATES — 4 types + follow-up ═══
@@ -2474,6 +2762,276 @@ async function loadCampaignAudit(){
   }
 }
 
+// ═══ CREATOR CALENDAR (Step 6) — UGC / livestream / paid boost scheduling, deliverables, payments, activity ROI ═══
+let CALENDAR_ENTRIES = [];
+let DELIVERABLES = [];
+let PAYMENTS = [];
+
+function populateCalendarCreatorSelects(){
+  const opts = '<option value="">— select —</option>' + CREATOR_LIBRARY.map(c=>`<option value="${c.id}">${c.name} (${c.platform}${c.handle?' @'+c.handle:''})</option>`).join('');
+  ['cal-creator','pay-creator'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = opts;
+    if(cur && CREATOR_LIBRARY.some(c=>String(c.id)===cur)) sel.value = cur;
+  });
+}
+
+function renderCalendarTypeFields(){
+  const type = document.getElementById('cal-type')?.value;
+  const timeLabel = document.getElementById('cal-time-label');
+  if(timeLabel) timeLabel.textContent = type==='livestream' ? 'Scheduled time (livestream)' : 'Scheduled time (optional)';
+}
+
+const ACTIVITY_TYPE_LABELS = {ugc:'UGC post', livestream:'Livestream', paid_boost:'Paid boost'};
+const CAL_STATUS_LABELS = {scheduled:'Scheduled', confirmed:'Confirmed', delivered:'Delivered', overdue:'Overdue', cancelled:'Cancelled'};
+
+async function addCalendarEntry(){
+  const msg = document.getElementById('cal-msg');
+  if(!S.campaignId){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Campaign required</div><div class="ibb">Save a campaign snapshot in Setup first — calendar entries are scoped to a campaign.</div></div>`; return; }
+  const creatorId = +document.getElementById('cal-creator').value || null;
+  const activityType = document.getElementById('cal-type').value;
+  const platform = document.getElementById('cal-platform').value;
+  const sku = document.getElementById('cal-sku').value.trim();
+  const title = document.getElementById('cal-title').value.trim();
+  const scheduledDate = document.getElementById('cal-date').value || null;
+  const scheduledTime = document.getElementById('cal-time').value || '';
+  const budgetAllocated = +document.getElementById('cal-budget').value || 0;
+  try{
+    await api('/calendar-entries', { method:'POST', body:{ campaignId:S.campaignId, creatorId, activityType, platform, sku, title, scheduledDate, scheduledTime, budgetAllocated } });
+    ['cal-sku','cal-title','cal-date','cal-time','cal-budget'].forEach(id=>document.getElementById(id).value='');
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Added to calendar</div><div class="ibb">${ACTIVITY_TYPE_LABELS[activityType]} scheduled.</div></div>`;
+    await loadCalendarEntries();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Save failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function loadCalendarEntries(){
+  if(!S.campaignId){ CALENDAR_ENTRIES = []; renderCalendarEntries(); return; }
+  try{
+    const data = await api(`/calendar-entries?campaignId=${S.campaignId}`);
+    CALENDAR_ENTRIES = data.items || [];
+    populateCalendarCreatorSelects();
+    renderCalendarEntries();
+  }catch(e){
+    const list = document.getElementById('cal-list');
+    if(list) list.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Calendar unavailable</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+function creatorNameById(id){
+  const c = CREATOR_LIBRARY.find(x=>x.id===id);
+  return c ? c.name : (id ? `Creator #${id}` : '—');
+}
+
+function renderCalendarEntries(){
+  const list = document.getElementById('cal-list');
+  const summary = document.getElementById('cal-summary');
+  if(!list) return;
+  const monthFilter = document.getElementById('cal-month-filter')?.value || '';
+  const typeFilter = document.getElementById('cal-type-filter')?.value || '';
+  const statusFilter = document.getElementById('cal-status-filter')?.value || '';
+  const items = CALENDAR_ENTRIES.filter(e=>{
+    if(monthFilter && !(e.scheduledDate||'').startsWith(monthFilter)) return false;
+    if(typeFilter && e.activityType !== typeFilter) return false;
+    if(statusFilter && e.status !== statusFilter) return false;
+    return true;
+  });
+  if(summary){
+    const counts = {ugc:0, livestream:0, paid_boost:0};
+    const budget = {ugc:0, livestream:0, paid_boost:0};
+    items.forEach(e=>{ if(counts[e.activityType]!==undefined){ counts[e.activityType]++; budget[e.activityType]+=Number(e.budgetAllocated||0); } });
+    summary.innerHTML = Object.keys(ACTIVITY_TYPE_LABELS).map(t=>
+      `<div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase;letter-spacing:.04em">${ACTIVITY_TYPE_LABELS[t]}</div><div style="font-size:18px;font-weight:600">${counts[t]}</div><div style="font-size:10.5px;color:var(--sl)">S$${budget[t].toLocaleString()} budgeted</div></div>`
+    ).join('') + `<div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase;letter-spacing:.04em">Overdue</div><div style="font-size:18px;font-weight:600;color:var(--rs)">${items.filter(e=>e.status==='overdue').length}</div><div style="font-size:10.5px;color:var(--sl)">needs follow-up</div></div>`;
+  }
+  if(!items.length){
+    list.innerHTML = `<div class="empty"><h4>No calendar entries${monthFilter||typeFilter||statusFilter?' for this filter':''}</h4><p>Schedule an activity above, or adjust the filters.</p></div>`;
+    return;
+  }
+  const statusOpts = Object.entries(CAL_STATUS_LABELS).map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  const rows = items.map(e=>`
+    <tr>
+      <td><span class="tag ${e.activityType==='livestream'?'tR':e.activityType==='paid_boost'?'tB':'tG'}">${ACTIVITY_TYPE_LABELS[e.activityType]||e.activityType}</span></td>
+      <td>${creatorNameById(e.creatorId)}</td>
+      <td>${e.title||'—'}${e.sku?`<div style="font-size:9.5px;color:var(--ms)">${e.sku}</div>`:''}</td>
+      <td>${e.platform||'—'}</td>
+      <td>${e.scheduledDate||'—'}${e.scheduledTime?' '+e.scheduledTime:''}</td>
+      <td>S$${Number(e.budgetAllocated||0).toLocaleString()}</td>
+      <td><select onchange="updateCalendarStatus(${e.id}, this.value)" style="font-size:10.5px;padding:4px 6px;border:1px solid var(--bd2);border-radius:6px">${statusOpts.replace(`value="${e.status}"`, `value="${e.status}" selected`)}</select></td>
+      <td style="white-space:nowrap"><button class="btn btn-outline btn-sm" onclick="deleteCalendarEntryUi(${e.id})">Remove</button></td>
+    </tr>`).join('');
+  list.innerHTML = `<table class="dt"><thead><tr><th>Type</th><th>Creator</th><th>Title / SKU</th><th>Platform</th><th>Scheduled</th><th>Budget</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const delivSel = document.getElementById('deliv-entry');
+  if(delivSel){
+    const cur = delivSel.value;
+    delivSel.innerHTML = '<option value="">— select a scheduled activity —</option>' + CALENDAR_ENTRIES.map(e=>`<option value="${e.id}">${ACTIVITY_TYPE_LABELS[e.activityType]} · ${creatorNameById(e.creatorId)} · ${e.scheduledDate||'no date'}</option>`).join('');
+    if(cur) delivSel.value = cur;
+  }
+}
+
+async function updateCalendarStatus(id, status){
+  try{
+    await api('/calendar-entries', { method:'POST', body:{ id, status } });
+    await loadCalendarEntries();
+  }catch(e){ alert('Status update failed: '+e.message); }
+}
+
+async function deleteCalendarEntryUi(id){
+  if(!confirm('Remove this calendar entry? Any proof-of-delivery submissions against it stay in the record.')) return;
+  await api('/calendar-entries/'+id, { method:'DELETE' });
+  await loadCalendarEntries();
+}
+
+async function submitDeliverable(){
+  const msg = document.getElementById('deliv-msg');
+  const calendarEntryId = +document.getElementById('deliv-entry').value || null;
+  const submissionUrl = document.getElementById('deliv-url').value.trim();
+  const submissionNote = document.getElementById('deliv-note').value.trim();
+  if(!calendarEntryId){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Select an activity</div><div class="ibb">Choose which scheduled activity this proof belongs to.</div></div>`; return; }
+  if(!submissionUrl){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">URL required</div><div class="ibb">Paste the link to the posted content or livestream replay.</div></div>`; return; }
+  const entry = CALENDAR_ENTRIES.find(e=>e.id===calendarEntryId);
+  try{
+    await api('/deliverables', { method:'POST', body:{ calendarEntryId, creatorId: entry?.creatorId||null, submissionUrl, submissionNote } });
+    document.getElementById('deliv-url').value=''; document.getElementById('deliv-note').value='';
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Submitted</div><div class="ibb">Marked as delivered on the calendar.</div></div>`;
+    await loadCalendarEntries();
+    await loadDeliverables();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Submit failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function loadDeliverables(){
+  const list = document.getElementById('deliv-list');
+  if(!S.campaignId || !list) return;
+  try{
+    const data = await api(`/deliverables?campaignId=${S.campaignId}`);
+    DELIVERABLES = data.items || [];
+    if(!DELIVERABLES.length){ list.innerHTML = ''; return; }
+    const rows = DELIVERABLES.map(d=>`<tr><td><a href="${d.submissionUrl}" target="_blank" rel="noreferrer">${d.submissionUrl.slice(0,50)}</a></td><td>${d.submissionNote||'—'}</td><td><span class="tag ${d.status==='approved'?'tS':d.status==='rejected'?'tR':'tG'}">${d.status}</span></td><td>${d.submittedAt?new Date(d.submittedAt).toLocaleString():'—'}</td><td><button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'approved')">Approve</button> <button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'rejected')">Reject</button></td></tr>`).join('');
+    list.innerHTML = `<table class="dt"><thead><tr><th>Submission</th><th>Note</th><th>Status</th><th>Submitted</th><th>Review</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){
+    list.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Deliverables unavailable</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function reviewDeliverable(id, status){
+  await api('/deliverables/'+id, { method:'PATCH', body:{ status } });
+  await loadDeliverables();
+}
+
+// Auto-fills the rate% field from the selected creator's own commission
+// setup (from the Creator Sources Library) so the operator doesn't have to
+// remember or re-type a rate that's already on file for that creator.
+function prefillPaymentRate(){
+  const creatorId = +document.getElementById('pay-creator').value || null;
+  const payType = document.getElementById('pay-type').value;
+  const rateInput = document.getElementById('pay-rate');
+  if(!creatorId || !rateInput) return;
+  const c = CREATOR_LIBRARY.find(x=>x.id===creatorId);
+  if(!c) return;
+  if(payType==='commission_livestream' && c.commissionLivestreamPct!=null) rateInput.value = c.commissionLivestreamPct;
+  else if(payType==='commission_ugc_affiliate' && c.commissionUgcAffiliatePct!=null) rateInput.value = c.commissionUgcAffiliatePct;
+  else if(payType==='flat' && c.flatFee!=null) document.getElementById('pay-amount').value = c.flatFee;
+}
+
+async function addPayment(){
+  const msg = document.getElementById('pay-msg');
+  if(!S.campaignId){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Campaign required</div><div class="ibb">Save a campaign snapshot first.</div></div>`; return; }
+  const creatorId = +document.getElementById('pay-creator').value || null;
+  const payType = document.getElementById('pay-type').value;
+  const basisAmount = +document.getElementById('pay-basis').value || 0;
+  const ratePct = document.getElementById('pay-rate').value ? +document.getElementById('pay-rate').value : null;
+  const amountOverride = document.getElementById('pay-amount').value ? +document.getElementById('pay-amount').value : undefined;
+  const scheduledDate = document.getElementById('pay-date').value || null;
+  const notes = document.getElementById('pay-notes').value.trim();
+  const body = { campaignId:S.campaignId, creatorId, payType, basisAmount, ratePct, scheduledDate, notes };
+  if(amountOverride !== undefined) body.amount = amountOverride;
+  try{
+    await api('/payments', { method:'POST', body });
+    ['pay-basis','pay-rate','pay-amount','pay-date','pay-notes'].forEach(id=>document.getElementById(id).value='');
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Payment logged</div><div class="ibb">Added to the ledger below.</div></div>`;
+    await loadPayments();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Log failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+const PAY_TYPE_LABELS = {flat:'Flat fee', gifting:'Gifting', commission_livestream:'Commission — livestream', commission_ugc_affiliate:'Commission — UGC affiliate'};
+
+async function loadPayments(){
+  const list = document.getElementById('pay-list');
+  const summary = document.getElementById('pay-summary');
+  if(!S.campaignId){ if(list) list.innerHTML=''; if(summary) summary.innerHTML=''; return; }
+  try{
+    const data = await api(`/payments?campaignId=${S.campaignId}`);
+    PAYMENTS = data.items || [];
+    if(summary){
+      const totalLogged = PAYMENTS.reduce((a,p)=>a+Number(p.amount||0),0);
+      const totalPaid = PAYMENTS.filter(p=>p.status==='paid').reduce((a,p)=>a+Number(p.amount||0),0);
+      const totalPending = totalLogged - totalPaid;
+      summary.innerHTML = `
+        <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Total logged</div><div style="font-size:18px;font-weight:600">S$${totalLogged.toLocaleString()}</div></div>
+        <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Paid</div><div style="font-size:18px;font-weight:600;color:var(--sg)">S$${totalPaid.toLocaleString()}</div></div>
+        <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Pending</div><div style="font-size:18px;font-weight:600;color:var(--rs)">S$${totalPending.toLocaleString()}</div></div>
+        <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Entries</div><div style="font-size:18px;font-weight:600">${PAYMENTS.length}</div></div>`;
+    }
+    if(!list) return;
+    if(!PAYMENTS.length){ list.innerHTML = `<div class="empty"><h4>No payments logged yet</h4><p>Log a flat fee, gifting note, or commission payment above.</p></div>`; return; }
+    const rows = PAYMENTS.map(p=>`<tr><td>${creatorNameById(p.creatorId)}</td><td>${PAY_TYPE_LABELS[p.payType]||p.payType}</td><td>${p.basisAmount?`S$${Number(p.basisAmount).toLocaleString()}`:'—'}</td><td>${p.ratePct!=null?p.ratePct+'%':'—'}</td><td>S$${Number(p.amount||0).toLocaleString()}</td><td><span class="tag ${p.status==='paid'?'tS':'tG'}">${p.status}</span></td><td style="white-space:nowrap">${p.status!=='paid'?`<button class="btn btn-outline btn-sm" onclick="markPaymentPaid(${p.id})">Mark paid</button>`:''} <button class="btn btn-outline btn-sm" onclick="removePayment(${p.id})">Remove</button></td></tr>`).join('');
+    list.innerHTML = `<table class="dt"><thead><tr><th>Creator</th><th>Type</th><th>Basis</th><th>Rate</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){
+    if(list) list.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Payments unavailable</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function markPaymentPaid(id){
+  await api('/payments/'+id, { method:'PATCH', body:{ status:'paid' } });
+  await loadPayments();
+}
+async function removePayment(id){
+  if(!confirm('Remove this payment entry?')) return;
+  await api('/payments/'+id, { method:'DELETE' });
+  await loadPayments();
+}
+
+async function addActivityKpi(){
+  const msg = document.getElementById('akpi-msg');
+  if(!S.campaignId){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Campaign required</div><div class="ibb">Save a campaign snapshot first.</div></div>`; return; }
+  const activityType = document.getElementById('akpi-type').value;
+  const spend = +document.getElementById('akpi-spend').value || 0;
+  const revenue = +document.getElementById('akpi-revenue').value || 0;
+  const gmv = +document.getElementById('akpi-gmv').value || 0;
+  try{
+    await api(`/campaigns/${S.campaignId}/activity-kpi`, { method:'POST', body:{ activityType, spend, revenue, gmv } });
+    ['akpi-spend','akpi-revenue','akpi-gmv'].forEach(id=>document.getElementById(id).value='');
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Logged</div><div class="ibb">Activity KPI entry saved.</div></div>`;
+    await loadActivityKpi();
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Save failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
+async function loadActivityKpi(){
+  const table = document.getElementById('akpi-table');
+  if(!S.campaignId || !table) { if(table) table.innerHTML=''; return; }
+  try{
+    const data = await api(`/campaigns/${S.campaignId}/activity-kpi`);
+    if(!data.summary.length){ table.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">No activity KPI logged yet</div><div class="ibb">Log spend/revenue by activity type above to see ROAS vs. benchmark here.</div></div>`; return; }
+    const rows = data.summary.map(s=>{
+      const roasText = s.roas!=null ? s.roas.toFixed(2)+'×' : '—';
+      const vsBenchmark = (s.roas!=null && s.benchmarkRoas) ? (s.roas>=s.benchmarkRoas ? `<span class="tag tS">≥ ${s.benchmarkRoas}× benchmark</span>` : `<span class="tag tR">below ${s.benchmarkRoas}× benchmark</span>`) : '—';
+      return `<tr><td>${ACTIVITY_TYPE_LABELS[s.activityType]||s.activityType}</td><td>S$${s.spend.toLocaleString()}</td><td>S$${s.revenue.toLocaleString()}</td><td>S$${s.gmv.toLocaleString()}</td><td>${roasText}</td><td>${vsBenchmark}</td></tr>`;
+    }).join('');
+    table.innerHTML = `<table class="dt"><thead><tr><th>Activity</th><th>Spend</th><th>Revenue</th><th>GMV</th><th>ROAS</th><th>vs. benchmark</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){
+    table.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Activity KPI unavailable</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
 // ═══ MARKDOWN-LITE RENDERER ═══
 function md(text){
   return text.split('\n').filter(l=>l.trim()).map(l=>{
@@ -2638,6 +3196,7 @@ checkBackend();
 });
 renderBriefBudgetEcho();
 renderBriefQuality();
+renderPartnershipFields();
 setInterval(checkBackend, 30000);
 setInterval(() => {
   if (document.getElementById('pg-2').classList.contains('on')) refreshQueueStatus();

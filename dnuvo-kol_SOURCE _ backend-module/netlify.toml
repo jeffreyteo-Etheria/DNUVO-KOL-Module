@@ -91,3 +91,33 @@
   from = "/connect/*"
   to = "/.netlify/functions/api/connect/:splat"
   status = 200
+
+[[redirects]]
+  from = "/calendar-entries"
+  to = "/.netlify/functions/api/calendar-entries"
+  status = 200
+
+[[redirects]]
+  from = "/calendar-entries/*"
+  to = "/.netlify/functions/api/calendar-entries/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/deliverables"
+  to = "/.netlify/functions/api/deliverables"
+  status = 200
+
+[[redirects]]
+  from = "/deliverables/*"
+  to = "/.netlify/functions/api/deliverables/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/payments"
+  to = "/.netlify/functions/api/payments"
+  status = 200
+
+[[redirects]]
+  from = "/payments/*"
+  to = "/.netlify/functions/api/payments/:splat"
+  status = 200
