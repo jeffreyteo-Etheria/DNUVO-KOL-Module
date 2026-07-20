@@ -45,12 +45,15 @@ const {
   bulkImportCreatorSources,
   searchCreatorSources,
   saveCalendarEntry,
+  getCalendarEntry,
   listCalendarEntries,
   deleteCalendarEntry,
   saveDeliverable,
+  getDeliverable,
   listDeliverables,
   updateDeliverableStatus,
   savePayment,
+  getPayment,
   listPayments,
   updatePaymentStatus,
   deletePayment,
@@ -108,6 +111,22 @@ async function requireCampaignAccess(req, res, campaignId) {
     return null;
   }
   return { access, campaign };
+}
+
+// Ownership gate for the calendar/deliverable/payment rows: superadmin passes
+// through, everyone else must match the row's own advertiser_id. Used instead
+// of trusting a campaignId/advertiserId the caller supplied in the request,
+// since that value is exactly what a cross-tenant read/write would forge.
+async function requireRowAccess(req, res, row, label) {
+  const access = await requireAccess(req, res);
+  if (!access) return null;
+  if (access.role === 'superadmin') return { access };
+  if (!row) { res.status(404).json({ error: `${label} not found` }); return null; }
+  if (Number(row.advertiserId) !== Number(access.advertiser.id)) {
+    res.status(403).json({ error: `This ${label} belongs to another advertiser.` });
+    return null;
+  }
+  return { access };
 }
 
 // ── Usage quotas (cost control for scraping / AI / verification) ───────────
@@ -343,7 +362,12 @@ app.post('/creator-sources/bulk-import', async (req, res) => {
 });
 
 function toCsvValue(v) {
-  const s = v === null || v === undefined ? '' : String(v);
+  let s = v === null || v === undefined ? '' : String(v);
+  // Neutralise CSV/formula injection: a cell starting with =, +, -, or @
+  // (or tab/CR, which some parsers also treat as formula-leading) executes
+  // as a formula when the file is opened in Excel/Sheets. Prefixing with a
+  // single quote forces spreadsheet apps to treat it as literal text.
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 const CREATOR_EXPORT_COLUMNS = [
@@ -394,15 +418,24 @@ app.get('/creator-sources/search', async (req, res) => {
 });
 
 // ── Creator activity calendar (UGC / livestream / paid_boost) ──────────────
+// Every route below trusts requireRowAccess/requireCampaignAccess to verify
+// tenant ownership — never the campaignId/advertiserId a caller supplied.
 app.get('/calendar-entries', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
     const campaignId = req.query.campaignId ? Number(req.query.campaignId) : null;
+    let access;
+    if (campaignId) {
+      const ctx = await requireCampaignAccess(req, res, campaignId);
+      if (!ctx) return;
+      access = ctx.access;
+    } else {
+      access = await requireAccess(req, res);
+      if (!access) return;
+    }
     const advertiserId = access.role === 'superadmin'
       ? (req.query.advertiserId ? Number(req.query.advertiserId) : null)
       : access.advertiser.id;
-    res.json({ items: await listCalendarEntries({ campaignId, advertiserId: campaignId ? null : advertiserId }) });
+    res.json({ items: await listCalendarEntries({ campaignId, advertiserId }) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -410,8 +443,20 @@ app.get('/calendar-entries', async (req, res) => {
 
 app.post('/calendar-entries', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
+    let access;
+    if (req.body.id) {
+      const existing = await getCalendarEntry(Number(req.body.id));
+      const ctx = await requireRowAccess(req, res, existing, 'calendar entry');
+      if (!ctx) return;
+      access = ctx.access;
+    } else if (req.body.campaignId) {
+      const ctx = await requireCampaignAccess(req, res, Number(req.body.campaignId));
+      if (!ctx) return;
+      access = ctx.access;
+    } else {
+      access = await requireAccess(req, res);
+      if (!access) return;
+    }
     const advertiserId = access.role === 'superadmin'
       ? (req.body.advertiserId ? Number(req.body.advertiserId) : null)
       : access.advertiser.id;
@@ -433,10 +478,14 @@ app.post('/calendar-entries/bulk-import', async (req, res) => {
     const advertiserId = access.role === 'superadmin'
       ? (req.body.advertiserId ? Number(req.body.advertiserId) : null)
       : access.advertiser.id;
+    // Every row is force-scoped to the caller's own advertiser — a row whose
+    // campaignId belongs to someone else simply lands as an orphaned entry
+    // under the caller's own advertiser_id rather than touching that other
+    // advertiser's actual data (listCalendarEntries always filters by both).
     const results = [];
     for (let i = 0; i < items.length; i += 1) {
       try {
-        const id = await saveCalendarEntry({ ...items[i], advertiserId });
+        const id = await saveCalendarEntry({ ...items[i], id: undefined, advertiserId });
         results.push({ row: i, ok: true, id });
       } catch (e) {
         results.push({ row: i, ok: false, error: e.message });
@@ -450,9 +499,11 @@ app.post('/calendar-entries/bulk-import', async (req, res) => {
 
 app.delete('/calendar-entries/:id', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
-    const deleted = await deleteCalendarEntry(Number(req.params.id));
+    const id = Number(req.params.id);
+    const existing = await getCalendarEntry(id);
+    const ctx = await requireRowAccess(req, res, existing, 'calendar entry');
+    if (!ctx) return;
+    const deleted = await deleteCalendarEntry(id);
     res.json({ deleted });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -462,10 +513,22 @@ app.delete('/calendar-entries/:id', async (req, res) => {
 // ── Proof-of-delivery submissions ───────────────────────────────────────────
 app.get('/deliverables', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
     const campaignId = req.query.campaignId ? Number(req.query.campaignId) : null;
     const calendarEntryId = req.query.calendarEntryId ? Number(req.query.calendarEntryId) : null;
+    if (campaignId) {
+      const ctx = await requireCampaignAccess(req, res, campaignId);
+      if (!ctx) return;
+    } else if (calendarEntryId) {
+      const entry = await getCalendarEntry(calendarEntryId);
+      const ctx = await requireRowAccess(req, res, entry, 'calendar entry');
+      if (!ctx) return;
+    } else {
+      const access = await requireAccess(req, res);
+      if (!access) return;
+      if (access.role !== 'superadmin') {
+        return res.status(400).json({ error: 'campaignId or calendarEntryId is required' });
+      }
+    }
     res.json({ items: await listDeliverables({ campaignId, calendarEntryId }) });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -474,8 +537,10 @@ app.get('/deliverables', async (req, res) => {
 
 app.post('/deliverables', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
+    const calendarEntryId = Number(req.body?.calendarEntryId);
+    const entry = calendarEntryId ? await getCalendarEntry(calendarEntryId) : null;
+    const ctx = await requireRowAccess(req, res, entry, 'calendar entry');
+    if (!ctx) return;
     const id = await saveDeliverable(req.body || {});
     res.json({ saved: true, id });
   } catch (e) {
@@ -485,8 +550,10 @@ app.post('/deliverables', async (req, res) => {
 
 app.patch('/deliverables/:id', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
+    const deliverable = await getDeliverable(Number(req.params.id));
+    const entry = deliverable ? await getCalendarEntry(deliverable.calendarEntryId) : null;
+    const ctx = await requireRowAccess(req, res, entry, 'deliverable');
+    if (!ctx) return;
     const { status, reviewerNotes } = req.body || {};
     if (!status) return res.status(400).json({ error: 'status is required' });
     await updateDeliverableStatus(Number(req.params.id), { status, reviewerNotes });
@@ -500,14 +567,21 @@ app.patch('/deliverables/:id', async (req, res) => {
 // pay_type: 'flat' | 'gifting' | 'commission_livestream' | 'commission_ugc_affiliate'
 app.get('/payments', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
     const campaignId = req.query.campaignId ? Number(req.query.campaignId) : null;
+    let access;
+    if (campaignId) {
+      const ctx = await requireCampaignAccess(req, res, campaignId);
+      if (!ctx) return;
+      access = ctx.access;
+    } else {
+      access = await requireAccess(req, res);
+      if (!access) return;
+    }
     const creatorId = req.query.creatorId ? Number(req.query.creatorId) : null;
     const advertiserId = access.role === 'superadmin'
       ? (req.query.advertiserId ? Number(req.query.advertiserId) : null)
       : access.advertiser.id;
-    res.json({ items: await listPayments({ campaignId, creatorId, advertiserId: (campaignId || creatorId) ? null : advertiserId }) });
+    res.json({ items: await listPayments({ campaignId, creatorId, advertiserId }) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -515,8 +589,15 @@ app.get('/payments', async (req, res) => {
 
 app.post('/payments', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
+    let access;
+    if (req.body.campaignId) {
+      const ctx = await requireCampaignAccess(req, res, Number(req.body.campaignId));
+      if (!ctx) return;
+      access = ctx.access;
+    } else {
+      access = await requireAccess(req, res);
+      if (!access) return;
+    }
     const advertiserId = access.role === 'superadmin'
       ? (req.body.advertiserId ? Number(req.body.advertiserId) : null)
       : access.advertiser.id;
@@ -536,8 +617,9 @@ app.post('/payments', async (req, res) => {
 
 app.patch('/payments/:id', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
+    const payment = await getPayment(Number(req.params.id));
+    const ctx = await requireRowAccess(req, res, payment, 'payment');
+    if (!ctx) return;
     const { status, paidAt } = req.body || {};
     if (!status) return res.status(400).json({ error: 'status is required' });
     await updatePaymentStatus(Number(req.params.id), { status, paidAt });
@@ -549,8 +631,9 @@ app.patch('/payments/:id', async (req, res) => {
 
 app.delete('/payments/:id', async (req, res) => {
   try {
-    const access = await requireAccess(req, res);
-    if (!access) return;
+    const payment = await getPayment(Number(req.params.id));
+    const ctx = await requireRowAccess(req, res, payment, 'payment');
+    if (!ctx) return;
     const deleted = await deletePayment(Number(req.params.id));
     res.json({ deleted });
   } catch (e) {

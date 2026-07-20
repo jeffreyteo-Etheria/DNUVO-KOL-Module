@@ -2904,6 +2904,20 @@ async function submitDeliverable(){
   }
 }
 
+function escHtml(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// Submitted proof-of-delivery URLs come from creators/agencies, not internal
+// staff — treat as untrusted: escape for the attribute/text, and only render
+// as a clickable link when the scheme is http(s) so a javascript: URI can't
+// execute on click.
+function safeSubmissionLinkHtml(url){
+  const raw = String(url||'');
+  const isSafeScheme = /^https?:\/\//i.test(raw.trim());
+  const label = escHtml(raw.slice(0,60));
+  if(!isSafeScheme) return `<span title="Non-http(s) link withheld for safety">${label}</span>`;
+  return `<a href="${escHtml(raw)}" target="_blank" rel="noreferrer noopener">${label}</a>`;
+}
 async function loadDeliverables(){
   const list = document.getElementById('deliv-list');
   if(!S.campaignId || !list) return;
@@ -2911,7 +2925,7 @@ async function loadDeliverables(){
     const data = await api(`/deliverables?campaignId=${S.campaignId}`);
     DELIVERABLES = data.items || [];
     if(!DELIVERABLES.length){ list.innerHTML = ''; return; }
-    const rows = DELIVERABLES.map(d=>`<tr><td><a href="${d.submissionUrl}" target="_blank" rel="noreferrer">${d.submissionUrl.slice(0,50)}</a></td><td>${d.submissionNote||'—'}</td><td><span class="tag ${d.status==='approved'?'tS':d.status==='rejected'?'tR':'tG'}">${d.status}</span></td><td>${d.submittedAt?new Date(d.submittedAt).toLocaleString():'—'}</td><td><button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'approved')">Approve</button> <button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'rejected')">Reject</button></td></tr>`).join('');
+    const rows = DELIVERABLES.map(d=>`<tr><td>${safeSubmissionLinkHtml(d.submissionUrl)}</td><td>${escHtml(d.submissionNote)||'—'}</td><td><span class="tag ${d.status==='approved'?'tS':d.status==='rejected'?'tR':'tG'}">${escHtml(d.status)}</span></td><td>${d.submittedAt?new Date(d.submittedAt).toLocaleString():'—'}</td><td><button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'approved')">Approve</button> <button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'rejected')">Reject</button></td></tr>`).join('');
     list.innerHTML = `<table class="dt"><thead><tr><th>Submission</th><th>Note</th><th>Status</th><th>Submitted</th><th>Review</th></tr></thead><tbody>${rows}</tbody></table>`;
   }catch(e){
     list.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Deliverables unavailable</div><div class="ibb">${e.message}</div></div>`;

@@ -839,26 +839,37 @@ function mapCalendarEntry(r) {
   };
 }
 
+async function getCalendarEntry(id) {
+  return mapCalendarEntry(get(`SELECT ${CALENDAR_COLUMNS} FROM creator_calendar_entries WHERE id = ?`, [id]));
+}
+
 async function saveCalendarEntry(payload) {
-  const {
-    id, advertiserId, campaignId, creatorId, activityType, title = '', sku = '',
-    platform = '', scheduledDate = null, scheduledTime = '', status = 'scheduled',
-    budgetAllocated = 0, notes = '',
-  } = payload;
-  if (!activityType) throw new Error('activityType is required');
-  if (id) {
+  if (payload.id) {
+    // Partial update (e.g. a bare {id, status} status change) merges onto the
+    // existing row instead of blanking every other column — the same pattern
+    // saveCreatorSource already uses, for the same reason.
+    const existing = await getCalendarEntry(payload.id);
+    if (!existing) throw new Error('Calendar entry not found');
+    const merged = { ...existing, ...Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined)) };
+    if (!merged.activityType) throw new Error('activityType is required');
     run(
       `UPDATE creator_calendar_entries
        SET campaign_id = ?, creator_id = ?, activity_type = ?, title = ?, sku = ?, platform = ?,
            scheduled_date = ?, scheduled_time = ?, status = ?, budget_allocated = ?, notes = ?,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [campaignId || null, creatorId || null, activityType, title, sku, platform,
-        scheduledDate, scheduledTime, status, budgetAllocated, notes, id]
+      [merged.campaignId || null, merged.creatorId || null, merged.activityType, merged.title, merged.sku, merged.platform,
+        merged.scheduledDate, merged.scheduledTime, merged.status, merged.budgetAllocated, merged.notes, payload.id]
     );
     persistDb();
-    return Number(id);
+    return Number(payload.id);
   }
+  const {
+    advertiserId, campaignId, creatorId, activityType, title = '', sku = '',
+    platform = '', scheduledDate = null, scheduledTime = '', status = 'scheduled',
+    budgetAllocated = 0, notes = '',
+  } = payload;
+  if (!activityType) throw new Error('activityType is required');
   const created = run(
     `INSERT INTO creator_calendar_entries
       (advertiser_id, campaign_id, creator_id, activity_type, title, sku, platform, scheduled_date, scheduled_time, status, budget_allocated, notes)
@@ -910,6 +921,10 @@ function mapDeliverable(r) {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
+}
+
+async function getDeliverable(id) {
+  return mapDeliverable(get(`SELECT ${DELIVERABLE_COLUMNS} FROM creator_deliverables WHERE id = ?`, [id]));
 }
 
 async function saveDeliverable(payload) {
@@ -981,6 +996,10 @@ function mapPayment(r) {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
+}
+
+async function getPayment(id) {
+  return mapPayment(get(`SELECT ${PAYMENT_COLUMNS} FROM creator_payments WHERE id = ?`, [id]));
 }
 
 async function savePayment(payload) {
@@ -1194,12 +1213,15 @@ module.exports = {
   bulkImportCreatorSources,
   searchCreatorSources,
   saveCalendarEntry,
+  getCalendarEntry,
   listCalendarEntries,
   deleteCalendarEntry,
   saveDeliverable,
+  getDeliverable,
   listDeliverables,
   updateDeliverableStatus,
   savePayment,
+  getPayment,
   listPayments,
   updatePaymentStatus,
   deletePayment,
