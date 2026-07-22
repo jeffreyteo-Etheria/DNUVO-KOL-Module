@@ -138,7 +138,7 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
 </head>
 <body>
 
-<div class="gate" id="login-gate">
+<div class="gate" id="login-gate" style="display:none">
   <div class="gate-card">
     <div class="gate-mark"><span>SocialMIND</span></div>
     <div class="gate-sub">Master Network by AKADIGITAL</div>
@@ -230,12 +230,16 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <div class="fld" style="margin:0"><label for="campaign-select">Load existing campaign</label><select id="campaign-select" title="Load existing campaign"><option value="">Select campaign...</option></select></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="if(!S.setup || confirm('Start a new campaign? This clears the current unsaved workspace (already-saved campaigns are unaffected).'))resetWorkspaceState()">+ New Campaign</button>
       <button class="btn btn-gold" onclick="saveCampaignSnapshot()">Save Campaign Snapshot</button>
       <button class="btn btn-outline" onclick="loadCampaignList()">Refresh Campaign List</button>
       <button class="btn btn-outline" onclick="loadSelectedCampaign()">Load Selected Campaign</button>
       <button class="btn btn-outline" id="btn-del-campaign" style="display:none;border-color:var(--rs);color:var(--rs)" onclick="deleteSelectedCampaign()">Delete Selected (Super Admin)</button>
     </div>
-    <div style="font-size:10.5px;color:var(--ms);margin-top:6px">Campaigns remain in the SocialMIND repository until deletion — only super admin can amend other advertisers' campaigns or delete.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn btn-outline" style="border-color:rgba(242,178,0,.6);color:#8A7000" onclick="loadDemoCampaign()">▶ Load Demo Campaign (Preview Mode)</button>
+    </div>
+    <div style="font-size:10.5px;color:var(--ms);margin-top:6px">Campaigns remain in the SocialMIND repository until deletion — only super admin can amend other advertisers' campaigns or delete. "New Campaign" clears the form for a real brief; "Load Demo Campaign" fills mock data and unlocks every step so you can walk through the whole pipeline without clearing the Brief Quality Score Gate.</div>
     <div id="campaign-msg" class="mt"></div>
   </div>
   <div class="ib ibg mb2"><div class="ibl" style="color:#8A7000">Why this gate exists</div><div class="ibb">Every output downstream — creator shortlists, content briefs, schedules, budget splits — is generated from these answers only. Nothing is pre-filled, nothing is mocked. Fields marked * are required to unlock Step 1.</div></div>
@@ -824,6 +828,12 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
 <script>
 // ═══ STATE (in-memory only — export/import via JSON file) ═══
 const S = { campaignId:null, campaignName:'', setup:null, creators:null, content:[], schedule:[], budget:null, verifications:[], manualCreators:[], kpiLatest:null, kpiHistory:[], sourcingData:null };
+
+// True while a mock "Load Demo Campaign" walkthrough is active and unsaved (no
+// real S.campaignId yet). Backend load/refresh functions check this so they
+// don't silently overwrite the in-memory demo data with an empty real fetch
+// when a locked step is opened for the first time.
+let DEMO_MODE = false;
 
 // ═══ PRICING & PROMO (Step 5) — client-side reference calculator, not persisted to campaign snapshot ═══
 const DEFAULT_PRICING_SKUS = [
@@ -1421,6 +1431,7 @@ function relockPipeline(){
 // Fresh campaign set for a new advertiser context — clears every pipeline
 // input/output so nothing leaks from the previously loaded advertiser.
 function resetWorkspaceState(){
+  DEMO_MODE = false;
   S.campaignId=null; S.campaignName=''; S.setup=null; S.creators=null; S.content=[]; S.schedule=[];
   S.budget=null; S.verifications=[]; S.manualCreators=[]; S.kpiLatest=null; S.kpiHistory=[]; S.sourcingData=null;
   ['campaign-name','s-audience','s-kol-personas','s-content-brief','s-guardrails','s-budget','s-brand-url',
@@ -1462,6 +1473,9 @@ function resetWorkspaceState(){
   renderBriefBudgetEcho();
   renderBriefQuality();
   renderCalendarEntries();
+  renderDeliverablesList();
+  renderPaymentsList();
+  renderActivityKpiTable([]);
   relockPipeline();
   goStep(0);
 }
@@ -1573,6 +1587,7 @@ function hydrateFromSnapshot(snapshot){
   restorePricingState(snapshot.pricing);
   applySetupToUI();
   if (S.setup) unlockAll();
+  if (S.budget && S.budget.length) renderBudgetTable(S.budget, S.setup.budget);
   document.getElementById('creators-output').innerHTML = S.creators
     ? `<div class="card"><div class="card-hd">Loaded Creator Candidates</div>${md(S.creators)}</div>`
     : '';
@@ -1620,6 +1635,7 @@ async function loadSelectedCampaign(){
   }
   try{
     const data = await api(`/campaigns/${id}`);
+    DEMO_MODE = false;
     S.campaignId = data.id;
     S.campaignName = data.name;
     if(AUTH.role === 'superadmin' && data.advertiserId){
@@ -1671,6 +1687,7 @@ async function saveCampaignSnapshot(){
       },
     });
     const campaign = data.campaign;
+    DEMO_MODE = false;
     S.campaignId = campaign.id;
     S.campaignName = campaign.name;
     document.getElementById('campaign-name').value = campaign.name;
@@ -1711,7 +1728,7 @@ function saveSetup(){
   if(missing.length){ msg.innerHTML=`<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Missing required fields</div><div class="ibb">${missing.join(' · ')}</div></div>`; return; }
   if(totalPct!==100){ msg.innerHTML=`<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Budget split invalid</div><div class="ibb">Pre-campaign budget plan must total 100%. Current: ${totalPct}%.</div></div>`; return; }
   if(briefQuality.score < 75){ msg.innerHTML=`<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Brief quality below threshold</div><div class="ibb">Current score ${briefQuality.score}/100. Minimum required is 75/100 before unlocking pipeline.</div></div>`; return; }
-  S.setup={budget,brand,loc,comp:comp.split('\n').filter(Boolean),handles:handles.split('\n').filter(Boolean),
+  const setup={budget,brand,loc,comp:comp.split('\n').filter(Boolean),handles:handles.split('\n').filter(Boolean),
     skus:skus.split('\n').filter(Boolean),dateStart:ds,dateEnd:de,
     floor:+document.getElementById('s-local-floor').value||70,
     platforms:[...document.querySelectorAll('.s-plat:checked')].map(c=>c.value),
@@ -1726,17 +1743,321 @@ function saveSetup(){
       contAmount:Math.round(budget*contPct/100),
     },
   };
+  applySetupAndUnlock(setup);
+  msg.innerHTML=`<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Setup saved — pipeline unlocked</div><div class="ibb">All five steps are open. Your inputs drive every generation from here. Use "Export setup" (top right) to save this configuration as a JSON file for reuse.</div></div>`;
+  goStep(1);
+}
+
+// Shared by saveSetup() (validated, real campaigns) and loadDemoCampaign()
+// (skips validation — for walkthrough/preview only).
+function applySetupAndUnlock(setup){
+  S.setup=setup;
   unlockAll();
   renderBriefBudgetEcho();
   renderBriefQuality();
-  document.getElementById('floor-echo').textContent=S.setup.floor;
-  const sel=document.getElementById('c-sku'); sel.innerHTML=S.setup.skus.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('floor-echo').textContent=setup.floor;
+  const sel=document.getElementById('c-sku'); sel.innerHTML=setup.skus.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('rec-inputs-echo').innerHTML=
-    `<strong>Budget:</strong> S$${budget.toLocaleString()}<br><strong>Market:</strong> ${loc} (creators ≥${S.setup.floor}% local)<br>`+
-    `<strong>Window:</strong> ${ds} → ${de}<br><strong>Platforms:</strong> ${S.setup.platforms.join(', ')}<br>`+
-    `<strong>Periods:</strong> ${S.setup.periods.join(', ')}<br><strong>Audience:</strong> ${S.setup.audience.slice(0,120)}<br><strong>KOL personas:</strong> ${S.setup.kolPersonas.slice(0,120)}<br><strong>SKUs:</strong> ${S.setup.skus.length} loaded<br><strong>Competitors:</strong> ${S.setup.comp.join(', ')}`;
-  msg.innerHTML=`<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Setup saved — pipeline unlocked</div><div class="ibb">All five steps are open. Your inputs drive every generation from here. Use "Export setup" (top right) to save this configuration as a JSON file for reuse.</div></div>`;
+    `<strong>Budget:</strong> S$${setup.budget.toLocaleString()}<br><strong>Market:</strong> ${setup.loc} (creators ≥${setup.floor}% local)<br>`+
+    `<strong>Window:</strong> ${setup.dateStart} → ${setup.dateEnd}<br><strong>Platforms:</strong> ${setup.platforms.join(', ')}<br>`+
+    `<strong>Periods:</strong> ${setup.periods.join(', ')}<br><strong>Audience:</strong> ${setup.audience.slice(0,120)}<br><strong>KOL personas:</strong> ${setup.kolPersonas.slice(0,120)}<br><strong>SKUs:</strong> ${setup.skus.length} loaded<br><strong>Competitors:</strong> ${setup.comp.join(', ')}`;
+}
+
+// Fills Setup with a realistic mock DNUVO brief and unlocks the whole pipeline
+// (Creators → Persistence) so the site can be clicked through end to end without
+// authoring a real brief or clearing the Brief Quality Score Gate. Nothing is saved
+// to the repository until "Save Campaign Snapshot" is clicked explicitly.
+function loadDemoCampaign(){
+  DEMO_MODE = true;
+  const today=new Date();
+  const ds=today.toISOString().slice(0,10);
+  const de=new Date(today.getTime()+45*86400000).toISOString().slice(0,10);
+  const fields={
+    'campaign-name':'DNUVO SG Q4 Launch (Demo)',
+    's-audience':'Women 22-35 in Singapore, acne-prone/sensitive skin, buys on Shopee, compares K-beauty efficacy and value before purchase.',
+    's-kol-personas':'Sensitive-skin educator micro KOL, K-beauty routine creator, value-comparison reviewer — mix of nano/micro for trust, one mid-tier for reach.',
+    's-content-brief':'Hook the skin concern in the first 3s, show application texture on camera, share proof points (before/after or dermatologist-reviewed), mention the ceramide barrier benefit, close with a clear CTA to store + creator code.',
+    's-guardrails':'No medical cure claims, no unrealistic overnight outcomes, avoid competitor defamation, disclose #ad per ASAS guidelines.',
+    's-budget':15000,
+    's-brand-url':'dnuvo.com.sg',
+    's-location':'Singapore',
+    's-local-floor':70,
+    's-competitors':'shopee.sg/cosrx.official\nbeautyofjoseon.com',
+    's-handles':'tiktok.com/@d.nuvo_official\ninstagram.com/d.nuvo',
+    's-skus':'Vitamin C Ampoule 15.5% — S$56 RRP / S$32 sale\nCalming Ampoule 30ml — S$64 / S$39',
+  };
+  Object.entries(fields).forEach(([id,val])=>{ const el=document.getElementById(id); if(el) el.value=val; });
+  document.getElementById('s-date-start').value=ds;
+  document.getElementById('s-date-end').value=de;
+  document.getElementById('s-pct-kol').value=45;
+  document.getElementById('s-pct-paid').value=30;
+  document.getElementById('s-pct-prod').value=15;
+  document.getElementById('s-pct-cont').value=10;
+  document.querySelectorAll('.s-plat').forEach(c=>{ c.checked=['TikTok','Instagram','Shopee','Shopify'].includes(c.value); });
+  document.querySelectorAll('.s-period').forEach(c=>{ c.checked=c.value==='BAU'||c.value==='11.11 Mega Sale'; });
+
+  const briefQuality=computeBriefQuality();
+  applySetupAndUnlock({
+    budget:15000, brand:'dnuvo.com.sg', loc:'Singapore',
+    comp:['shopee.sg/cosrx.official','beautyofjoseon.com'],
+    handles:['tiktok.com/@d.nuvo_official','instagram.com/d.nuvo'],
+    skus:['Vitamin C Ampoule 15.5% — S$56 RRP / S$32 sale','Calming Ampoule 30ml — S$64 / S$39'],
+    dateStart:ds, dateEnd:de, floor:70,
+    platforms:['TikTok','Instagram','Shopee','Shopify'],
+    periods:['BAU','11.11 Mega Sale'],
+    audience:fields['s-audience'], kolPersonas:fields['s-kol-personas'],
+    contentBrief:fields['s-content-brief'], guardrails:fields['s-guardrails'],
+    briefQuality:briefQuality.score,
+    budgetPlan:{kolPct:45,paidPct:30,prodPct:15,contPct:10,kolAmount:6750,paidAmount:4500,prodAmount:2250,contAmount:1500},
+  });
+
+  loadDemoCreatorsStep();
+  loadDemoContentStep();
+  buildSchedule(); // fully deterministic from S.setup — same function real users click
+  loadDemoRecommendStep();
+  loadDemoBudgetKpiStep();
+  loadDemoPricingPromoStep();
+  loadDemoCalendarStep();
+
+  document.getElementById('setup-msg').innerHTML=`<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Demo campaign loaded — pipeline unlocked</div><div class="ibb">All seven steps are open and pre-populated with example content — Creators, Content, Recommend, Budget · KPI, Pricing · Promo, and Creator Calendar. Click through each in order to see the intended workflow and cadence. This is mock data only — nothing is saved to the repository until you click "Save Campaign Snapshot", and every "Build/Generate" button still works normally if you want to regenerate a section for real.</div></div>`;
   goStep(1);
+}
+
+// ─── Demo mock data, one function per pipeline step, mirroring the real
+// render functions so the walkthrough looks exactly like a live campaign. ───
+
+function loadDemoCreatorsStep(){
+  document.getElementById('t-nano').value=4;
+  document.getElementById('t-micro').value=4;
+  document.getElementById('t-mid').value=1;
+  document.getElementById('t-macro').value=0;
+  document.getElementById('t-mega').value=0;
+  document.getElementById('t-backup').value=5;
+  document.getElementById('p-paid').checked=true;
+  document.getElementById('p-gift').checked=true;
+  document.getElementById('p-live').checked=true;
+  document.getElementById('p-affiliate').checked=true;
+  document.getElementById('p-affiliate-shop').checked=false;
+
+  const now=new Date().toISOString();
+  CREATOR_LIBRARY=[
+    {id:1,name:'Dr Samuel GP',platform:'TikTok',handle:'drsamuelgp',followers:142000,tier:'micro',rateNote:'S$2,000-3,500 · 2 posts + endorsement + Spark rights',niche:'Clinical/GP skincare authority',tiktokHandle:'drsamuelgp',outreachStage:'confirmed',partnershipType:'paid',flatFee:2800,verifyStatus:'live',verifiedAt:now},
+    {id:2,name:'graceglazee',platform:'TikTok',handle:'graceglazee',followers:68000,tier:'micro',rateNote:'S$700-1,200 · 2-3 posts + affiliate code',niche:'K-beauty, 30-day skin diary',tiktokHandle:'graceglazee',outreachStage:'replied',partnershipType:'commission',commissionUgcAffiliatePct:10,verifyStatus:'live',verifiedAt:now},
+    {id:3,name:'lifewithmils',platform:'TikTok',handle:'lifewithmils',followers:51000,tier:'micro',rateNote:'S$600-1,000 · 2-3 posts + affiliate code',niche:'Lifestyle/wellness, routine narrative',tiktokHandle:'lifewithmils',outreachStage:'messaged',partnershipType:'unset',verifyStatus:'unverified'},
+    {id:4,name:'evelynnexie',platform:'TikTok',handle:'evelynnexie',followers:18000,tier:'nano',rateNote:'S$120-250 · 1-2 posts',niche:'Beauty/food/lifestyle micro',tiktokHandle:'evelynnexie',outreachStage:'not_contacted',partnershipType:'gifting',verifyStatus:'unverified'},
+    {id:5,name:'gaga_beauty',platform:'TikTok',handle:'gaga_beauty',followers:73000,tier:'micro',rateNote:'S$600-900 · 2 posts + 1 co-hosted LIVE',niche:'Beauty reviews/tutorials, LIVE co-host',tiktokHandle:'gaga_beauty',outreachStage:'replied',partnershipType:'commission',commissionLivestreamPct:15,verifyStatus:'live',verifiedAt:now},
+    {id:6,name:'vedawinfam',platform:'TikTok',handle:'vedawinfam',followers:210000,tier:'mid',rateNote:'S$2,000 · 3-part series incl. 1 co-hosted LIVE',niche:'Thai/SG lifestyle+family, LIVE commerce history',tiktokHandle:'vedawinfam',outreachStage:'confirmed',partnershipType:'commission',commissionLivestreamPct:15,commissionUgcAffiliatePct:10,verifyStatus:'live',verifiedAt:now},
+    {id:7,name:'jannatul_mitsuisen',platform:'TikTok',handle:'jannatul_mitsuisen',followers:640000,tier:'macro',rateNote:'Max S$2,500 · verify rate first',niche:'Large SG skincare reach',tiktokHandle:'jannatul_mitsuisen',outreachStage:'not_contacted',partnershipType:'unset',verifyStatus:'unverified'},
+  ];
+  renderCreatorLibrary();
+
+  const shortlist=[
+    {name:'Dr Samuel GP',handle:'drsamuelgp',platform:'TikTok',followers:142000,engagementRate:4.8,location:'Singapore',localConfidence:0.94,score:92,profileUrl:'https://www.tiktok.com/@drsamuelgp'},
+    {name:'vedawinfam',handle:'vedawinfam',platform:'TikTok',followers:210000,engagementRate:5.6,location:'Singapore',localConfidence:0.88,score:89,profileUrl:'https://www.tiktok.com/@vedawinfam'},
+    {name:'gaga_beauty',handle:'gaga_beauty',platform:'TikTok',followers:73000,engagementRate:6.1,location:'Singapore',localConfidence:0.91,score:85,profileUrl:'https://www.tiktok.com/@gaga_beauty'},
+    {name:'graceglazee',handle:'graceglazee',platform:'TikTok',followers:68000,engagementRate:5.3,location:'Singapore',localConfidence:0.86,score:81,profileUrl:'https://www.tiktok.com/@graceglazee'},
+  ];
+  const backups=[
+    {name:'lifewithmils',handle:'lifewithmils',platform:'TikTok',followers:51000,engagementRate:4.2,location:'Singapore',localConfidence:0.79,score:74,profileUrl:'https://www.tiktok.com/@lifewithmils'},
+    {name:'evelynnexie',handle:'evelynnexie',platform:'TikTok',followers:18000,engagementRate:5.9,location:'Singapore',localConfidence:0.83,score:70,profileUrl:'https://www.tiktok.com/@evelynnexie'},
+  ];
+  const debug={
+    totalRawCandidates:63, dedupedCandidates:46,
+    rejected:{
+      missing_profile_url:[],
+      below_tier_floor:[{platform:'TikTok',handle:'randomsgfoodie',followers:3200,tier:'nano',localConfidence:0.4}],
+      low_sg_confidence:[{platform:'TikTok',handle:'globalbeautyhub',followers:210000,tier:'mid',localConfidence:0.32}],
+      missing_followers:[],
+      unknown_tier:[],
+    },
+  };
+  S.sourcingData={shortlist,backups,actorsUsed:[{actor:'tiktok-profile-scraper'},{actor:'tiktok-search-scraper'}],totalCandidates:46,debug};
+  const aiBrief=`1. OUTREACH ORDER (top picks)
+- Dr Samuel GP — clinical authority builds trust fast for a ceramide-barrier claim; lead with him for credibility.
+- vedawinfam — highest reach at solid engagement; anchor the 11.11 LIVE around this creator.
+- gaga_beauty — LIVE co-host history de-risks the livestream slot; pair with vedawinfam.
+- graceglazee — 30-day skin diary format matches the content brief's "proof points" requirement almost exactly.
+
+2. RISKS to verify before contracting
+- Confirm activity recency (last 90 days) on all four before sending contracts.
+- gaga_beauty's LIVE co-host claim should be checked against an actual past LIVE recording, not just bio text.
+- jannatul_mitsuisen's reach is large but SG-local confidence is unconfirmed — verify before committing macro budget.
+
+3. MESSAGE ANGLES by tier
+- Micro (Dr Samuel GP, graceglazee, gaga_beauty): lead with product efficacy + a specific proof point, offer Spark rights.
+- Mid (vedawinfam): lead with a LIVE co-host proposal tied to the 11.11 mega sale window.
+- Nano (evelynnexie): gifting-only, ask for one authentic try-on post, no fee.`;
+  S.creators=aiBrief;
+  const out=document.getElementById('creators-output');
+  out.innerHTML=
+    `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Multi-actor sourcing complete (demo)</div><div class="ibb">Actors used: tiktok-profile-scraper · tiktok-search-scraper<br>Total candidates scored: 46 · Shortlist: ${shortlist.length} · Backups: ${backups.length}</div></div>`+
+    renderCreatorTable(shortlist,'Shortlist — Highest Accuracy Candidates','shortlist')+
+    renderCreatorTable(backups,'Backup Pool','backups')+
+    renderRejectionDebugPanel(debug)+
+    `<div class="card"><div class="card-hd">AI Outreach Prioritization (from sourced list)</div>${md(aiBrief)}</div>`+
+    `<div class="ib ibg mt"><div class="ibl" style="color:#8A7000">Next action</div><div class="ibb">Copy profile URLs from shortlist and run Creator Link Verification Queue below before final outreach. Only proceed with live profiles.</div></div>`;
+  document.getElementById('rn-1').classList.add('done');document.getElementById('rl-1').classList.add('done');
+}
+
+function loadDemoContentStep(){
+  document.getElementById('c-footage').value='90-min Shopee LIVE recording from 12 Jun — host demos Vit C Ampoule at 00:14, applies Calming Ampoule at 00:31, Q&A on milia at 00:47.';
+  const scriptsText=`1. SCRIPT A — "The 3am breakout truth"
+Hook (0-3s, spoken): "POV: your skin barrier is begging for help and you keep ignoring it."
+- 0-3s: Close-up on visible redness, on-screen text "day 47 of ignoring this"
+- 3-8s: Show Vitamin C Ampoule dropper, apply to clean skin
+- 8-15s: Before/after split screen, mention ceramide barrier repair
+- 15-22s: Direct-to-camera proof point — "dermatologist-reviewed, no fragrance"
+- 22-30s: CTA — "Link in bio, code [CODE] for 15% off"
+On-screen text: "ceramide barrier repair" / "code: [CODE]"
+Caption: 3am breakout confessions 😭 shop link in bio #sgskintok #kbeauty #skincaretiktok #dnuvo #ceramiderepair
+
+2. SCRIPT B — "Why I switched from my old vitamin C serum"
+Hook (0-3s, spoken): "I used to get a stinging reaction from every vitamin C serum — until this one."
+- 0-4s: Hold up old serum bottle, react to a mock sting
+- 4-10s: Switch to Vitamin C Ampoule 15.5%, apply, calm reaction
+- 10-18s: Ingredient callout — 15.5% Vit C + ceramide barrier support, no fragrance
+- 18-25s: 7-day skin diary montage (day 1 vs day 7)
+- 25-30s: CTA — "Shopee link in bio, code [CODE]"
+On-screen text: "no more stinging" / "15.5% Vit C"
+Caption: finally a vitamin C that doesn't fight my skin #sgskintok #dnuvo #vitaminc #sensitiveskin`;
+  const editText=`Clip 1 — 0:14–0:29 (15s, TikTok 9:16)
+Hook (0-2s): freeze-frame on the ampoule dropper close-up, zoom-punch-in
+Cuts: hard cut on each demo beat, caption burns in "Vit C Ampoule 15.5%" at 0:16
+Audio: keep original host VO, add trending sound under B-roll only
+Export: 1080x1920, captions on
+
+Clip 2 — 0:31–0:46 (15s, TikTok 9:16)
+Hook (0-2s): host's reaction shot to the Calming Ampoule texture
+Cuts: slow-motion on application, caption "Calming Ampoule 30ml" at 0:33
+Audio: keep original host VO
+Export: 1080x1920, captions on
+
+Clip 3 — 0:47–1:15 (28s, Instagram Reels 9:16)
+Hook (0-2s): host reading out the milia question on screen
+Cuts: text overlay for the Q&A, cut host answer down to essential 20s
+Audio: TTS overlay recapping the answer as a caption card at the end
+Export: 1080x1920, captions on
+
+Clip 4 — 0:14 + 0:31 combined (30s, Shopify/TikTok Shop 9:16)
+Hook (0-2s): side-by-side of both ampoules on the shelf
+Cuts: alternate 5s beats between Vit C and Calming demos
+Audio: keep original host VO, add CTA voice tag at the end
+Export: 1080x1920, captions on`;
+  S.content.push({type:'scripts',sku:'Vitamin C Ampoule 15.5% — S$56 RRP / S$32 sale',text:scriptsText});
+  S.content.push({type:'edit',text:editText});
+  document.getElementById('content-output').innerHTML=
+    `<div class="card mb"><div class="card-hd">Scripts — Vitamin C Ampoule 15.5%</div>${md(scriptsText)}</div>`+
+    `<div class="card"><div class="card-hd">Edit Brief — from your footage</div>${md(editText)}</div>`;
+  document.getElementById('rn-2').classList.add('done');document.getElementById('rl-2').classList.add('done');
+}
+
+function loadDemoRecommendStep(){
+  const modules=[
+    ['Channel strategy — Shopee · TikTok Shop · Lazada · Shopify',`1. SHOPEE (primary channel)
+- Low effort: nominate both hero SKUs for the 11.11 category campaign 10-14 days ahead. Timeline: this week. Impact: Both.
+- Med effort: build a bundle listing (Vit C + Calming) at ~18% below sum-of-parts. Timeline: 2 weeks. Impact: ROAS.
+2. TIKTOK SHOP
+- Med effort: enable Spark Ads on Dr Samuel GP's and vedawinfam's top posts once live. Timeline: after first content batch. Impact: ROAS.
+3. SHOPIFY D2C
+- Low effort: turn on Subscribe & Save at 20% first-cycle discount. Timeline: this week. Impact: Trust + retention.
+4. LAZADA
+- Low effort: mirror the Shopee listing once floors are confirmed; hold paid spend here until Shopee proves out. Timeline: after 15-review gate. Impact: ROAS.`],
+    ['Ads plan — Spark, Shopee Ads, Meta',`1. SPARK ADS (TikTok)
+- Med effort: boost the top-performing organic UGC clip once it clears 3% ER. Timeline: week 2. Impact: ROAS.
+2. SHOPEE ADS
+- Low effort: keyword ads on "ceramide serum", "vitamin c ampoule sg" — only after the 15-review gate clears. Timeline: post-gate. Impact: ROAS.
+3. META (IG/FB)
+- Low effort: retarget site visitors who viewed the PDP but didn't purchase. Timeline: ongoing. Impact: ROAS.
+- Respects the 15-Shopee-review gate — no paid discount depth beyond BAU until then.`],
+    [`Pricing vs competitors: shopee.sg/cosrx.official, beautyofjoseon.com`,`1. POSITIONING
+- Vitamin C Ampoule 15.5% (S$56 SRP / S$32 sale) sits below typical COSRX Vitamin C pricing on Shopee — lead with "clinical-grade % at accessible price."
+- Calming Ampoule 30ml (S$64 / S$39) — check Beauty of Joseon's calming-line pricing directly on Shopee before setting final promo depth; live prices weren't provided.
+2. WHAT TO CHECK
+- Pull current Shopee listing prices for both competitors before finalizing 11.11 discount depth.
+- Confirm COSRX's current bundle mechanics — pricing pressure usually comes from bundles, not single-SKU price.`],
+    ['CRM — lead capture, nurture flows, retention',`1. LEAD CAPTURE
+- Low effort: exit-intent popup offering 10% off first order for email capture on Shopify. Timeline: this week. Impact: Both.
+2. NURTURE
+- Med effort: 3-email flow (welcome → routine guide → review reward reminder) via Klaviyo. Timeline: 2 weeks. Impact: Trust.
+3. RETENTION / LTV
+- Med effort: launch Subscribe & Save with escalating review-reward vouchers (S$8/S$12/S$15) tied to D+7/D+14/D+30. Timeline: 3 weeks. Impact: Both — this is the highest-LTV lever in the whole plan.`],
+  ];
+  document.getElementById('rec-output').innerHTML=modules.map(([title,text])=>`<div class="card mb"><div class="card-hd">${title}</div>${md(text)}</div>`).join('');
+  document.getElementById('rn-3').classList.add('done');document.getElementById('rl-3').classList.add('done');
+}
+
+function loadDemoBudgetKpiStep(){
+  buildBudget(); // deterministic from S.setup.budget + tier counts set in loadDemoCreatorsStep()
+
+  document.getElementById('k-spend').value=4200;
+  document.getElementById('k-rev').value=9800;
+  document.getElementById('k-orders').value=126;
+  document.getElementById('k-leads').value=340;
+  document.getElementById('k-views').value=182000;
+  document.getElementById('k-clicks').value=5100;
+  calcKPI();
+
+  const day=n=>new Date(Date.now()+n*86400000).toISOString();
+  S.kpiHistory=[
+    {createdAt:day(-14),spend:2600,revenue:5200,orders:68,metrics:{roas:2.0,ctr:2.8}},
+    {createdAt:day(-7),spend:3400,revenue:7100,orders:94,metrics:{roas:2.09,ctr:2.95}},
+    {createdAt:day(0),spend:4200,revenue:9800,orders:126,metrics:{roas:2.33,ctr:3.1}},
+  ];
+  S.kpiLatest=S.kpiHistory[S.kpiHistory.length-1];
+  renderKpiHistory();
+  renderAuditTrail([
+    {createdAt:day(-14),action:'campaign.created',actor:AUTH.code?'advertiser':'jeffrey.teo@akadigital.net',details:{name:'DNUVO SG Q4 Launch (Demo)'}},
+    {createdAt:day(-10),action:'kpi.saved',actor:'jeffrey.teo@akadigital.net',details:{spend:2600,revenue:5200}},
+    {createdAt:day(-3),action:'calendar_entry.created',actor:'jeffrey.teo@akadigital.net',details:{activityType:'ugc',creatorId:2}},
+    {createdAt:day(0),action:'kpi.saved',actor:'jeffrey.teo@akadigital.net',details:{spend:4200,revenue:9800}},
+  ]);
+}
+
+function loadDemoPricingPromoStep(){
+  document.getElementById('pr-kol-live').value=25;
+  document.getElementById('pr-kol-shop').value=12;
+  renderPricingTable(); // also renders the LIVE/affiliate floor table
+  renderPromoPlaybook();
+  const strategyText=`1. BAU — no action needed, listed SRP only.
+2. FLASH SALE — feature Vitamin C Ampoule at 18% off (within the ~20%+ Shopify floor room); Calming Ampoule stays at 9% on Shopee per its floor flag.
+3. LIVE VOUCHER — 15% off both hero SKUs for the 2-hour co-hosted LIVE window with vedawinfam; well inside floor room on TikTok Shop.
+4. 11.11 MEGA SALE — 25% off the Vit C + Calming bundle; Water Cream and Ceramide Toner are flagged thin-margin, hold those at BAU this cycle instead of discounting.
+5. BUNDLES (always-on) — Vit C + Calming bundle at ~18% below sum-of-parts, clears 40%+ blended margin after COGS.
+Respect the 15-review gate before any paid discount deeper than BAU.`;
+  document.getElementById('pricing-ai-output').innerHTML=`<div class="card">${md(strategyText)}</div>`;
+}
+
+function loadDemoCalendarStep(){
+  const day=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
+  CALENDAR_ENTRIES=[
+    {id:101,activityType:'ugc',creatorId:2,title:'Vitamin C Ampoule unboxing + 7-day diary ep.1',sku:'Vitamin C Ampoule 15.5%',platform:'TikTok',scheduledDate:day(-10),scheduledTime:'',budgetAllocated:900,status:'delivered'},
+    {id:102,activityType:'ugc',creatorId:5,title:'Calming Ampoule morning routine',sku:'Calming Ampoule 30ml',platform:'TikTok',scheduledDate:day(-3),scheduledTime:'',budgetAllocated:750,status:'delivered'},
+    {id:103,activityType:'livestream',creatorId:6,title:'11.11 co-hosted LIVE — Vit C + Calming bundle',sku:'Vitamin C Ampoule + Calming Ampoule bundle',platform:'TikTok',scheduledDate:day(6),scheduledTime:'20:00',budgetAllocated:2000,status:'confirmed'},
+    {id:104,activityType:'paid_boost',creatorId:1,title:'Spark Ads boost — Dr Samuel GP endorsement clip',sku:'Vitamin C Ampoule 15.5%',platform:'TikTok',scheduledDate:day(2),scheduledTime:'',budgetAllocated:1200,status:'scheduled'},
+    {id:105,activityType:'ugc',creatorId:3,title:'Value-comparison review vs competitor',sku:'Calming Ampoule 30ml',platform:'TikTok',scheduledDate:day(-1),scheduledTime:'',budgetAllocated:600,status:'overdue'},
+  ];
+  populateCalendarCreatorSelects();
+  renderCalendarEntries();
+
+  DELIVERABLES=[
+    {id:201,calendarEntryId:101,creatorId:2,submissionUrl:'https://www.tiktok.com/@graceglazee/video/7300000000000000001',submissionNote:'Ep.1 of 30-day diary, posted on time',status:'approved',submittedAt:day(-9)+'T10:00:00.000Z'},
+    {id:202,calendarEntryId:102,creatorId:5,submissionUrl:'https://www.tiktok.com/@gaga_beauty/video/7300000000000000002',submissionNote:'Posted with #sgskintok, #dnuvo tags',status:'pending',submittedAt:day(-3)+'T09:00:00.000Z'},
+  ];
+  renderDeliverablesList();
+
+  PAYMENTS=[
+    {id:301,creatorId:1,payType:'flat',basisAmount:0,ratePct:null,amount:2800,status:'paid'},
+    {id:302,creatorId:2,payType:'commission_ugc_affiliate',basisAmount:1850,ratePct:10,amount:185,status:'pending'},
+    {id:303,creatorId:5,payType:'commission_livestream',basisAmount:0,ratePct:15,amount:0,status:'pending'},
+    {id:304,creatorId:4,payType:'gifting',basisAmount:0,ratePct:null,amount:0,status:'paid'},
+  ];
+  renderPaymentsList();
+
+  renderActivityKpiTable([
+    {activityType:'ugc',spend:1650,revenue:4200,gmv:5100,roas:2.55,benchmarkRoas:1.5},
+    {activityType:'livestream',spend:2000,revenue:3600,gmv:4300,roas:1.8,benchmarkRoas:1.5},
+    {activityType:'paid_boost',spend:1200,revenue:1400,gmv:1600,roas:1.17,benchmarkRoas:1.5},
+  ]);
 }
 function exportConfig(){
   if(!S.setup){alert('Nothing to export yet — save Setup first.');return;}
@@ -1900,6 +2221,9 @@ function removeManualKol(id){
 let CREATOR_LIBRARY = [];
 
 async function loadCreatorLibrary(){
+  // Don't clobber the in-memory demo library with an empty real fetch while
+  // an unsaved walkthrough is active — see DEMO_MODE.
+  if(DEMO_MODE && !S.campaignId) return;
   const msg = document.getElementById('cs-msg');
   try{
     const adv = activeAdvertiser();
@@ -2652,10 +2976,15 @@ function buildBudget(){
   rows.push(['Content production & editing',Math.round(rem*0.25),'AI UGC + edits from your footage']);
   rows.push(['CRM & tools',Math.round(rem*0.15),'Klaviyo, Judge.me, QR cards']);
   rows.push(['Contingency',Math.round(rem*0.10),'Flash-sale vouchers / top-up winning ads']);
-  const total=rows.reduce((a,r)=>a+r[1],0);
   S.budget=rows;
-  document.getElementById('budget-view').outerHTML=`<div id="budget-view"><table class="dt"><thead><tr><th>Line</th><th>S$</th><th>Note</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td style="font-weight:700">S$${r[1].toLocaleString()}</td><td>${r[2]}</td></tr>`).join('')}<tr style="background:var(--gdbg)"><td><strong>Total</strong></td><td><strong>S$${total.toLocaleString()}</strong></td><td>vs input S$${b.toLocaleString()}</td></tr></tbody></table></div>`;
+  renderBudgetTable(rows, b);
   document.getElementById('rn-4').classList.add('done');document.getElementById('rl-3').classList.add('done');
+}
+function renderBudgetTable(rows, totalBudget){
+  const el=document.getElementById('budget-view');
+  if(!el || !rows || !rows.length) return;
+  const total=rows.reduce((a,r)=>a+r[1],0);
+  el.outerHTML=`<div id="budget-view"><table class="dt"><thead><tr><th>Line</th><th>S$</th><th>Note</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td style="font-weight:700">S$${r[1].toLocaleString()}</td><td>${r[2]}</td></tr>`).join('')}<tr style="background:var(--gdbg)"><td><strong>Total</strong></td><td><strong>S$${total.toLocaleString()}</strong></td><td>vs input S$${totalBudget.toLocaleString()}</td></tr></tbody></table></div>`;
 }
 function calcKPI(){
   const spend=+t('k-spend'),rev=+t('k-rev'),orders=+t('k-orders'),leads=+t('k-leads'),views=+t('k-views'),clicks=+t('k-clicks');
@@ -2715,6 +3044,18 @@ async function saveKpiEntry(){
   }
 }
 
+function renderKpiHistory(){
+  const history = document.getElementById('kpi-history');
+  if(!history) return;
+  if (!S.kpiHistory.length) {
+    history.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">KPI history</div><div class="ibb">No saved KPI entries yet for this campaign.</div></div>`;
+    return;
+  }
+  const rows = S.kpiHistory.map((k) =>
+    `<tr><td>${new Date(k.createdAt).toLocaleString()}</td><td>S$${Number(k.spend||0).toLocaleString()}</td><td>S$${Number(k.revenue||0).toLocaleString()}</td><td>${k.orders||0}</td><td>${k.metrics?.roas ?? '—'}${k.metrics?.roas ? '×' : ''}</td><td>${k.metrics?.ctr ?? '—'}${k.metrics?.ctr ? '%' : ''}</td></tr>`
+  ).join('');
+  history.innerHTML = `<table class="dt"><thead><tr><th>Timestamp</th><th>Spend</th><th>Revenue</th><th>Orders</th><th>ROAS</th><th>CTR</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 async function loadKpiHistory(){
   const history = document.getElementById('kpi-history');
   if(!S.campaignId){
@@ -2729,19 +3070,22 @@ async function loadKpiHistory(){
       fillKpiForm(S.kpiLatest);
       calcKPI();
     }
-    if (!S.kpiHistory.length) {
-      history.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">KPI history</div><div class="ibb">No saved KPI entries yet for this campaign.</div></div>`;
-      return;
-    }
-    const rows = S.kpiHistory.map((k) =>
-      `<tr><td>${new Date(k.createdAt).toLocaleString()}</td><td>S$${Number(k.spend||0).toLocaleString()}</td><td>S$${Number(k.revenue||0).toLocaleString()}</td><td>${k.orders||0}</td><td>${k.metrics?.roas ?? '—'}${k.metrics?.roas ? '×' : ''}</td><td>${k.metrics?.ctr ?? '—'}${k.metrics?.ctr ? '%' : ''}</td></tr>`
-    ).join('');
-    history.innerHTML = `<table class="dt"><thead><tr><th>Timestamp</th><th>Spend</th><th>Revenue</th><th>Orders</th><th>ROAS</th><th>CTR</th></tr></thead><tbody>${rows}</tbody></table>`;
+    renderKpiHistory();
   }catch(e){
     history.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">KPI history unavailable</div><div class="ibb">${e.message}</div></div>`;
   }
 }
 
+function renderAuditTrail(items){
+  const out = document.getElementById('audit-output');
+  if(!out) return;
+  if(!items.length){
+    out.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Campaign audit trail</div><div class="ibb">No logged actions yet.</div></div>`;
+    return;
+  }
+  const rows = items.map((a) => `<tr><td>${new Date(a.createdAt).toLocaleString()}</td><td>${a.action}</td><td>${a.actor}</td><td>${JSON.stringify(a.details || {})}</td></tr>`).join('');
+  out.innerHTML = `<div class="card"><div class="card-hd">Campaign audit trail</div><table class="dt"><thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Details</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 async function loadCampaignAudit(){
   const out = document.getElementById('audit-output');
   if(!S.campaignId){
@@ -2750,13 +3094,7 @@ async function loadCampaignAudit(){
   }
   try{
     const data = await api(`/campaigns/${S.campaignId}/audit?limit=12`);
-    const items = data.items || [];
-    if(!items.length){
-      out.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">Campaign audit trail</div><div class="ibb">No logged actions yet.</div></div>`;
-      return;
-    }
-    const rows = items.map((a) => `<tr><td>${new Date(a.createdAt).toLocaleString()}</td><td>${a.action}</td><td>${a.actor}</td><td>${JSON.stringify(a.details || {})}</td></tr>`).join('');
-    out.innerHTML = `<div class="card"><div class="card-hd">Campaign audit trail</div><table class="dt"><thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Details</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    renderAuditTrail(data.items || []);
   }catch(e){
     out.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Audit unavailable</div><div class="ibb">${e.message}</div></div>`;
   }
@@ -2809,7 +3147,7 @@ async function addCalendarEntry(){
 }
 
 async function loadCalendarEntries(){
-  if(!S.campaignId){ CALENDAR_ENTRIES = []; renderCalendarEntries(); return; }
+  if(!S.campaignId){ if(!DEMO_MODE){ CALENDAR_ENTRIES = []; renderCalendarEntries(); } return; }
   try{
     const data = await api(`/calendar-entries?campaignId=${S.campaignId}`);
     CALENDAR_ENTRIES = data.items || [];
@@ -2918,15 +3256,20 @@ function safeSubmissionLinkHtml(url){
   if(!isSafeScheme) return `<span title="Non-http(s) link withheld for safety">${label}</span>`;
   return `<a href="${escHtml(raw)}" target="_blank" rel="noreferrer noopener">${label}</a>`;
 }
+function renderDeliverablesList(){
+  const list = document.getElementById('deliv-list');
+  if(!list) return;
+  if(!DELIVERABLES.length){ list.innerHTML = ''; return; }
+  const rows = DELIVERABLES.map(d=>`<tr><td>${safeSubmissionLinkHtml(d.submissionUrl)}</td><td>${escHtml(d.submissionNote)||'—'}</td><td><span class="tag ${d.status==='approved'?'tS':d.status==='rejected'?'tR':'tG'}">${escHtml(d.status)}</span></td><td>${d.submittedAt?new Date(d.submittedAt).toLocaleString():'—'}</td><td><button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'approved')">Approve</button> <button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'rejected')">Reject</button></td></tr>`).join('');
+  list.innerHTML = `<table class="dt"><thead><tr><th>Submission</th><th>Note</th><th>Status</th><th>Submitted</th><th>Review</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 async function loadDeliverables(){
   const list = document.getElementById('deliv-list');
   if(!S.campaignId || !list) return;
   try{
     const data = await api(`/deliverables?campaignId=${S.campaignId}`);
     DELIVERABLES = data.items || [];
-    if(!DELIVERABLES.length){ list.innerHTML = ''; return; }
-    const rows = DELIVERABLES.map(d=>`<tr><td>${safeSubmissionLinkHtml(d.submissionUrl)}</td><td>${escHtml(d.submissionNote)||'—'}</td><td><span class="tag ${d.status==='approved'?'tS':d.status==='rejected'?'tR':'tG'}">${escHtml(d.status)}</span></td><td>${d.submittedAt?new Date(d.submittedAt).toLocaleString():'—'}</td><td><button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'approved')">Approve</button> <button class="btn btn-outline btn-sm" onclick="reviewDeliverable(${d.id},'rejected')">Reject</button></td></tr>`).join('');
-    list.innerHTML = `<table class="dt"><thead><tr><th>Submission</th><th>Note</th><th>Status</th><th>Submitted</th><th>Review</th></tr></thead><tbody>${rows}</tbody></table>`;
+    renderDeliverablesList();
   }catch(e){
     list.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Deliverables unavailable</div><div class="ibb">${e.message}</div></div>`;
   }
@@ -2976,27 +3319,32 @@ async function addPayment(){
 
 const PAY_TYPE_LABELS = {flat:'Flat fee', gifting:'Gifting', commission_livestream:'Commission — livestream', commission_ugc_affiliate:'Commission — UGC affiliate'};
 
+function renderPaymentsList(){
+  const list = document.getElementById('pay-list');
+  const summary = document.getElementById('pay-summary');
+  if(summary){
+    const totalLogged = PAYMENTS.reduce((a,p)=>a+Number(p.amount||0),0);
+    const totalPaid = PAYMENTS.filter(p=>p.status==='paid').reduce((a,p)=>a+Number(p.amount||0),0);
+    const totalPending = totalLogged - totalPaid;
+    summary.innerHTML = `
+      <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Total logged</div><div style="font-size:18px;font-weight:600">S$${totalLogged.toLocaleString()}</div></div>
+      <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Paid</div><div style="font-size:18px;font-weight:600;color:var(--sg)">S$${totalPaid.toLocaleString()}</div></div>
+      <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Pending</div><div style="font-size:18px;font-weight:600;color:var(--rs)">S$${totalPending.toLocaleString()}</div></div>
+      <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Entries</div><div style="font-size:18px;font-weight:600">${PAYMENTS.length}</div></div>`;
+  }
+  if(!list) return;
+  if(!PAYMENTS.length){ list.innerHTML = `<div class="empty"><h4>No payments logged yet</h4><p>Log a flat fee, gifting note, or commission payment above.</p></div>`; return; }
+  const rows = PAYMENTS.map(p=>`<tr><td>${creatorNameById(p.creatorId)}</td><td>${PAY_TYPE_LABELS[p.payType]||p.payType}</td><td>${p.basisAmount?`S$${Number(p.basisAmount).toLocaleString()}`:'—'}</td><td>${p.ratePct!=null?p.ratePct+'%':'—'}</td><td>S$${Number(p.amount||0).toLocaleString()}</td><td><span class="tag ${p.status==='paid'?'tS':'tG'}">${p.status}</span></td><td style="white-space:nowrap">${p.status!=='paid'?`<button class="btn btn-outline btn-sm" onclick="markPaymentPaid(${p.id})">Mark paid</button>`:''} <button class="btn btn-outline btn-sm" onclick="removePayment(${p.id})">Remove</button></td></tr>`).join('');
+  list.innerHTML = `<table class="dt"><thead><tr><th>Creator</th><th>Type</th><th>Basis</th><th>Rate</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 async function loadPayments(){
   const list = document.getElementById('pay-list');
   const summary = document.getElementById('pay-summary');
-  if(!S.campaignId){ if(list) list.innerHTML=''; if(summary) summary.innerHTML=''; return; }
+  if(!S.campaignId){ if(!DEMO_MODE){ if(list) list.innerHTML=''; if(summary) summary.innerHTML=''; } return; }
   try{
     const data = await api(`/payments?campaignId=${S.campaignId}`);
     PAYMENTS = data.items || [];
-    if(summary){
-      const totalLogged = PAYMENTS.reduce((a,p)=>a+Number(p.amount||0),0);
-      const totalPaid = PAYMENTS.filter(p=>p.status==='paid').reduce((a,p)=>a+Number(p.amount||0),0);
-      const totalPending = totalLogged - totalPaid;
-      summary.innerHTML = `
-        <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Total logged</div><div style="font-size:18px;font-weight:600">S$${totalLogged.toLocaleString()}</div></div>
-        <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Paid</div><div style="font-size:18px;font-weight:600;color:var(--sg)">S$${totalPaid.toLocaleString()}</div></div>
-        <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Pending</div><div style="font-size:18px;font-weight:600;color:var(--rs)">S$${totalPending.toLocaleString()}</div></div>
-        <div class="kpi-mini" style="border:1px solid var(--bd);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--ms);text-transform:uppercase">Entries</div><div style="font-size:18px;font-weight:600">${PAYMENTS.length}</div></div>`;
-    }
-    if(!list) return;
-    if(!PAYMENTS.length){ list.innerHTML = `<div class="empty"><h4>No payments logged yet</h4><p>Log a flat fee, gifting note, or commission payment above.</p></div>`; return; }
-    const rows = PAYMENTS.map(p=>`<tr><td>${creatorNameById(p.creatorId)}</td><td>${PAY_TYPE_LABELS[p.payType]||p.payType}</td><td>${p.basisAmount?`S$${Number(p.basisAmount).toLocaleString()}`:'—'}</td><td>${p.ratePct!=null?p.ratePct+'%':'—'}</td><td>S$${Number(p.amount||0).toLocaleString()}</td><td><span class="tag ${p.status==='paid'?'tS':'tG'}">${p.status}</span></td><td style="white-space:nowrap">${p.status!=='paid'?`<button class="btn btn-outline btn-sm" onclick="markPaymentPaid(${p.id})">Mark paid</button>`:''} <button class="btn btn-outline btn-sm" onclick="removePayment(${p.id})">Remove</button></td></tr>`).join('');
-    list.innerHTML = `<table class="dt"><thead><tr><th>Creator</th><th>Type</th><th>Basis</th><th>Rate</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+    renderPaymentsList();
   }catch(e){
     if(list) list.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Payments unavailable</div><div class="ibb">${e.message}</div></div>`;
   }
@@ -3029,18 +3377,23 @@ async function addActivityKpi(){
   }
 }
 
+function renderActivityKpiTable(summary){
+  const table = document.getElementById('akpi-table');
+  if(!table) return;
+  if(!summary.length){ table.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">No activity KPI logged yet</div><div class="ibb">Log spend/revenue by activity type above to see ROAS vs. benchmark here.</div></div>`; return; }
+  const rows = summary.map(s=>{
+    const roasText = s.roas!=null ? s.roas.toFixed(2)+'×' : '—';
+    const vsBenchmark = (s.roas!=null && s.benchmarkRoas) ? (s.roas>=s.benchmarkRoas ? `<span class="tag tS">≥ ${s.benchmarkRoas}× benchmark</span>` : `<span class="tag tR">below ${s.benchmarkRoas}× benchmark</span>`) : '—';
+    return `<tr><td>${ACTIVITY_TYPE_LABELS[s.activityType]||s.activityType}</td><td>S$${s.spend.toLocaleString()}</td><td>S$${s.revenue.toLocaleString()}</td><td>S$${s.gmv.toLocaleString()}</td><td>${roasText}</td><td>${vsBenchmark}</td></tr>`;
+  }).join('');
+  table.innerHTML = `<table class="dt"><thead><tr><th>Activity</th><th>Spend</th><th>Revenue</th><th>GMV</th><th>ROAS</th><th>vs. benchmark</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 async function loadActivityKpi(){
   const table = document.getElementById('akpi-table');
-  if(!S.campaignId || !table) { if(table) table.innerHTML=''; return; }
+  if(!S.campaignId || !table) { if(table && !DEMO_MODE) table.innerHTML=''; return; }
   try{
     const data = await api(`/campaigns/${S.campaignId}/activity-kpi`);
-    if(!data.summary.length){ table.innerHTML = `<div class="ib ibsk"><div class="ibl" style="color:var(--sk)">No activity KPI logged yet</div><div class="ibb">Log spend/revenue by activity type above to see ROAS vs. benchmark here.</div></div>`; return; }
-    const rows = data.summary.map(s=>{
-      const roasText = s.roas!=null ? s.roas.toFixed(2)+'×' : '—';
-      const vsBenchmark = (s.roas!=null && s.benchmarkRoas) ? (s.roas>=s.benchmarkRoas ? `<span class="tag tS">≥ ${s.benchmarkRoas}× benchmark</span>` : `<span class="tag tR">below ${s.benchmarkRoas}× benchmark</span>`) : '—';
-      return `<tr><td>${ACTIVITY_TYPE_LABELS[s.activityType]||s.activityType}</td><td>S$${s.spend.toLocaleString()}</td><td>S$${s.revenue.toLocaleString()}</td><td>S$${s.gmv.toLocaleString()}</td><td>${roasText}</td><td>${vsBenchmark}</td></tr>`;
-    }).join('');
-    table.innerHTML = `<table class="dt"><thead><tr><th>Activity</th><th>Spend</th><th>Revenue</th><th>GMV</th><th>ROAS</th><th>vs. benchmark</th></tr></thead><tbody>${rows}</tbody></table>`;
+    renderActivityKpiTable(data.summary);
   }catch(e){
     table.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Activity KPI unavailable</div><div class="ibb">${e.message}</div></div>`;
   }
@@ -3197,7 +3550,9 @@ checkBackend();
     document.getElementById('login-gate').style.display = 'none';
     await bootDashboard();
   } catch(_) {
+    // True gate (OPEN_ACCESS=false on the backend) — reveal the access-code screen.
     document.getElementById('gate-open-note')?.remove();
+    document.getElementById('login-gate').style.display = '';
   }
 })();
 ['s-budget','s-pct-kol','s-pct-paid','s-pct-prod','s-pct-cont'].forEach((id)=>{
