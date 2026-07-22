@@ -31,14 +31,6 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
 .adv-pill{display:flex;align-items:center;gap:8px;padding:4px 9px;border-radius:20px;border:1px solid rgba(255,255,255,.45);background:rgba(255,252,246,.92);color:#3A382F}
 .adv-pill img{height:16px;width:auto;display:block}
 .adv-pill span{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.gate{position:fixed;inset:0;z-index:500;background:linear-gradient(135deg,#211F1B 0%,#3B3831 60%,#5A5347 100%);display:flex;align-items:center;justify-content:center}
-.gate-card{width:min(400px,92vw);background:#FFFDF8;border-radius:14px;padding:34px 30px;box-shadow:0 24px 64px rgba(0,0,0,.4)}
-.gate-mark{font-family:"Space Grotesk",sans-serif;font-size:26px;font-weight:700;letter-spacing:.05em;color:#1E1D1A}
-.gate-mark span{background:linear-gradient(120deg,#E39B00,#F07F13);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.gate-sub{font-size:9.5px;text-transform:uppercase;letter-spacing:.2em;color:var(--ms);margin:4px 0 22px}
-.gate input{width:100%;padding:11px 13px;border:1px solid var(--bd2);border-radius:8px;font-family:"JetBrains Mono",monospace;font-size:13px;outline:none;margin-bottom:10px}
-.gate input:focus{border-color:var(--gl);box-shadow:0 0 0 3px rgba(242,178,0,.15)}
-.gate-note{font-size:10.5px;color:var(--ms);line-height:1.7;margin-top:14px}
 
 /* PIPELINE RAIL — signature */
 .rail{background:#fff;border-bottom:2px solid var(--bd2);padding:14px 26px 12px;position:sticky;top:78px;z-index:99}
@@ -138,18 +130,6 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
 </head>
 <body>
 
-<div class="gate" id="login-gate" style="display:none">
-  <div class="gate-card">
-    <div class="gate-mark"><span>SocialMIND</span></div>
-    <div class="gate-sub">Master Network by AKADIGITAL</div>
-    <div id="gate-open-note" class="ib ibg mb" style="margin-bottom:12px"><div class="ibb">Pre-launch open access — taking you straight to the dashboard…</div></div>
-    <input id="gate-code" type="password" placeholder="Access code" onkeydown="if(event.key==='Enter')gateLogin()">
-    <button class="btn btn-gold" style="width:100%" onclick="gateLogin()">Enter Dashboard →</button>
-    <div id="gate-msg"></div>
-    <div class="gate-note">Super admin code opens the full SocialMIND repository (all advertisers, all campaigns).<br>An advertiser access code opens that advertiser's dashboard only.</div>
-  </div>
-</div>
-
 <div class="topbar">
   <div class="tb-l">
     <div class="gem"></div>
@@ -166,7 +146,6 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
     <div class="tb-pill" style="border-color:rgba(255,199,44,.6);color:#FFE8A8">AI Live</div>
     <div class="tb-pill" id="api-pill">Backend: checking...</div>
     <button class="tb-pill" style="cursor:pointer;background:none" onclick="exportConfig()">⬇ Export setup</button>
-    <button class="tb-pill" style="cursor:pointer;background:none" onclick="gateLogout()">Log out</button>
   </div>
 </div>
 
@@ -1049,49 +1028,6 @@ async function api(path, opts={}){
   const data = await r.json().catch(() => ({}));
   if(!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
   return data;
-}
-
-// ═══ LOGIN GATE ═══
-async function gateLogin(){
-  const code = document.getElementById('gate-code').value.trim();
-  const msg = document.getElementById('gate-msg');
-  if(!code){ msg.innerHTML = `<div class="ib ibr mt"><div class="ibb">Enter an access code.</div></div>`; return; }
-  msg.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
-  try{
-    const data = await api('/auth/login', { method:'POST', body:{ accessCode: code } });
-    AUTH.code = code;
-    AUTH.role = data.role;
-    AUTH.advertiser = data.advertiser || null;
-    sessionStorage.setItem('sm_access', code);
-    msg.innerHTML = '';
-    document.getElementById('login-gate').style.display = 'none';
-    await bootDashboard();
-  }catch(e){
-    msg.innerHTML = `<div class="ib ibr mt"><div class="ibb">${e.message}</div></div>`;
-  }
-}
-
-function gateLogout(){
-  sessionStorage.removeItem('sm_access');
-  location.reload();
-}
-
-async function tryResumeSession(){
-  const code = sessionStorage.getItem('sm_access');
-  if(!code) return false;
-  try{
-    AUTH.code = code;
-    const data = await api('/auth/login', { method:'POST', body:{ accessCode: code } });
-    AUTH.role = data.role;
-    AUTH.advertiser = data.advertiser || null;
-    document.getElementById('login-gate').style.display = 'none';
-    await bootDashboard();
-    return true;
-  }catch(_){
-    AUTH.code = '';
-    sessionStorage.removeItem('sm_access');
-    return false;
-  }
 }
 
 async function bootDashboard(){
@@ -3544,20 +3480,18 @@ function exportSourcingAllCSV(){
 
 checkBackend();
 (async () => {
-  if (await tryResumeSession()) return;
-  // Pre-launch open access: try entering without a code. If the backend is
-  // gated (OPEN_ACCESS=false), this fails and the login gate stays visible.
+  // No password gate: every visitor boots straight into the dashboard as
+  // super admin (the backend's OPEN_ACCESS default treats an empty access
+  // code this way). If the request itself fails, surface it inline rather
+  // than blocking access behind a login screen.
   try {
     const data = await api('/auth/login', { method:'POST', body:{ accessCode: '' } });
     AUTH.code = '';
     AUTH.role = data.role;
     AUTH.advertiser = data.advertiser || null;
-    document.getElementById('login-gate').style.display = 'none';
     await bootDashboard();
-  } catch(_) {
-    // True gate (OPEN_ACCESS=false on the backend) — reveal the access-code screen.
-    document.getElementById('gate-open-note')?.remove();
-    document.getElementById('login-gate').style.display = '';
+  } catch(e) {
+    document.getElementById('api-pill').textContent = `Backend: ${e.message}`;
   }
 })();
 ['s-budget','s-pct-kol','s-pct-paid','s-pct-prod','s-pct-cont'].forEach((id)=>{
