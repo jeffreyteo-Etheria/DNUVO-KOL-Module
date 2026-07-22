@@ -29,16 +29,27 @@ function getBlobStore() {
   }
 }
 
-function persistDb() {
+async function persistDb() {
   const bytes = db.export();
   fs.writeFileSync(dbPath, Buffer.from(bytes));
   const store = getBlobStore();
-  if (store) {
-    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    blobWriteChain = blobWriteChain
-      .then(() => store.set(BLOB_KEY, buf))
-      .then(() => { storageMode = 'netlify-blobs'; storageError = null; })
-      .catch((e) => { storageError = 'set: ' + e.message; console.error('Blob persist failed:', e.message); });
+  if (!store) return;
+  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  // Chain onto any write already in flight so overlapping calls on the same warm
+  // instance still land in order, but — critically — await the tail before
+  // returning. Netlify Functions can freeze/recycle the instance right after the
+  // HTTP response is sent; a fire-and-forget blob write here used to race that
+  // freeze and get silently dropped, so a caller would see {saved:true} for a
+  // write that never actually reached durable storage.
+  blobWriteChain = blobWriteChain.then(() => store.set(BLOB_KEY, buf));
+  try {
+    await blobWriteChain;
+    storageMode = 'netlify-blobs';
+    storageError = null;
+  } catch (e) {
+    storageError = 'set: ' + e.message;
+    console.error('Blob persist failed:', e.message);
+    throw e; // don't report success on a write that didn't durably persist
   }
 }
 
@@ -329,7 +340,7 @@ async function initDb() {
     run('UPDATE campaigns SET advertiser_id = ? WHERE advertiser_id IS NULL', [seeded.id]);
   }
 
-  persistDb();
+  await persistDb();
 }
 
 function generateAccessCode() {
@@ -355,14 +366,14 @@ async function saveAdvertiser({ id, company, brand, logo }) {
       `UPDATE advertisers SET company = ?, brand = ?, logo_data = COALESCE(?, logo_data), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [company, brand, logo || null, id]
     );
-    persistDb();
+    await persistDb();
     return Number(id);
   }
   const created = run(
     `INSERT INTO advertisers (company, brand, logo_data, access_code) VALUES (?, ?, ?, ?)`,
     [company, brand, logo || null, generateAccessCode()]
   );
-  persistDb();
+  await persistDb();
   return created.lastID;
 }
 
@@ -439,7 +450,7 @@ async function saveCampaign(payload) {
         id,
       ]
     );
-    persistDb();
+    await persistDb();
     return Number(id);
   }
 
@@ -461,7 +472,7 @@ async function saveCampaign(payload) {
       row.pricing_json,
     ]
   );
-  persistDb();
+  await persistDb();
   return created.lastID;
 }
 
@@ -516,7 +527,7 @@ async function deleteAdvertiser(id) {
     throw new Error(`Advertiser still has ${owned.n} campaign(s) in the repository. Delete those first.`);
   }
   const res = run('DELETE FROM advertisers WHERE id = ?', [id]);
-  persistDb();
+  await persistDb();
   return res.changes > 0;
 }
 
@@ -524,7 +535,7 @@ async function deleteCampaign(id) {
   run('DELETE FROM campaign_kpi_entries WHERE campaign_id = ?', [id]);
   run('DELETE FROM campaign_audit_logs WHERE campaign_id = ?', [id]);
   const res = run('DELETE FROM campaigns WHERE id = ?', [id]);
-  persistDb();
+  await persistDb();
   return res.changes > 0;
 }
 
@@ -534,7 +545,7 @@ async function logCampaignAudit({ campaignId, action, actor = 'dashboard', detai
      VALUES (?, ?, ?, ?)`,
     [campaignId, action, actor, JSON.stringify(details)]
   );
-  persistDb();
+  await persistDb();
 }
 
 async function listCampaignAudit(campaignId, limit = 50) {
@@ -563,7 +574,7 @@ async function saveKpiEntry({ campaignId, spend = 0, revenue = 0, orders = 0, le
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [campaignId, spend, revenue, orders, leads, views, clicks, notes]
   );
-  persistDb();
+  await persistDb();
   return row.lastID;
 }
 
@@ -685,7 +696,7 @@ async function saveCreatorSource(payload) {
         merged.commissionUgcAffiliatePct ?? null, merged.paymentStatus || 'unpaid', merged.paymentNotes || '',
         payload.id]
     );
-    persistDb();
+    await persistDb();
     return Number(payload.id);
   }
   const {
@@ -726,7 +737,7 @@ async function saveCreatorSource(payload) {
       tiktokHandle, instagramHandle, metaHandle, lineId,
       partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct, paymentStatus, paymentNotes]
   );
-  persistDb();
+  await persistDb();
   const row = get(
     `SELECT id FROM creator_sources WHERE profile_url = ? AND advertiser_id = ?`,
     [profileUrl, advKey]
@@ -800,7 +811,7 @@ async function getCreatorSourcesByIds(ids) {
 
 async function deleteCreatorSource(id) {
   const res = run('DELETE FROM creator_sources WHERE id = ?', [id]);
-  persistDb();
+  await persistDb();
   return res.changes > 0;
 }
 
@@ -809,7 +820,7 @@ async function updateCreatorSourceVerification(id, { status, http, verifiedAt })
     `UPDATE creator_sources SET verify_status = ?, verify_http = ?, verified_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     [status, http ?? null, verifiedAt, id]
   );
-  persistDb();
+  await persistDb();
 }
 
 // ── Creator activity calendar (UGC / livestream / paid_boost) ──────────────
@@ -861,7 +872,7 @@ async function saveCalendarEntry(payload) {
       [merged.campaignId || null, merged.creatorId || null, merged.activityType, merged.title, merged.sku, merged.platform,
         merged.scheduledDate, merged.scheduledTime, merged.status, merged.budgetAllocated, merged.notes, payload.id]
     );
-    persistDb();
+    await persistDb();
     return Number(payload.id);
   }
   const {
@@ -877,7 +888,7 @@ async function saveCalendarEntry(payload) {
     [advertiserId || null, campaignId || null, creatorId || null, activityType, title, sku, platform,
       scheduledDate, scheduledTime, status, budgetAllocated, notes]
   );
-  persistDb();
+  await persistDb();
   return created.lastID;
 }
 
@@ -896,7 +907,7 @@ async function listCalendarEntries({ campaignId = null, advertiserId = null } = 
 async function deleteCalendarEntry(id) {
   run('DELETE FROM creator_deliverables WHERE calendar_entry_id = ?', [id]);
   const res = run('DELETE FROM creator_calendar_entries WHERE id = ?', [id]);
-  persistDb();
+  await persistDb();
   return res.changes > 0;
 }
 
@@ -936,7 +947,7 @@ async function saveDeliverable(payload) {
     [calendarEntryId, creatorId || null, submissionUrl, submissionNote]
   );
   run(`UPDATE creator_calendar_entries SET status = 'delivered', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [calendarEntryId]);
-  persistDb();
+  await persistDb();
   return created.lastID;
 }
 
@@ -968,7 +979,7 @@ async function updateDeliverableStatus(id, { status, reviewerNotes = '' }) {
     `UPDATE creator_deliverables SET status = ?, reviewer_notes = ?, reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     [status, reviewerNotes, id]
   );
-  persistDb();
+  await persistDb();
 }
 
 // ── Creator payment ledger (flat fee, livestream commission, UGC affiliate commission) ──
@@ -1017,7 +1028,7 @@ async function savePayment(payload) {
        WHERE id = ?`,
       [campaignId || null, creatorId || null, calendarEntryId || null, payType, basisAmount, ratePct, amount, status, scheduledDate, notes, id]
     );
-    persistDb();
+    await persistDb();
     return Number(id);
   }
   const created = run(
@@ -1026,7 +1037,7 @@ async function savePayment(payload) {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [advertiserId || null, campaignId || null, creatorId || null, calendarEntryId || null, payType, basisAmount, ratePct, amount, status, scheduledDate, notes]
   );
-  persistDb();
+  await persistDb();
   return created.lastID;
 }
 
@@ -1045,12 +1056,12 @@ async function updatePaymentStatus(id, { status, paidAt = null }) {
     `UPDATE creator_payments SET status = ?, paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     [status, status === 'paid' ? (paidAt || new Date().toISOString()) : paidAt, id]
   );
-  persistDb();
+  await persistDb();
 }
 
 async function deletePayment(id) {
   const res = run('DELETE FROM creator_payments WHERE id = ?', [id]);
-  persistDb();
+  await persistDb();
   return res.changes > 0;
 }
 
@@ -1062,7 +1073,7 @@ async function saveActivityKpi({ campaignId, activityType, spend = 0, revenue = 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [campaignId, activityType, spend, revenue, gmv, views, clicks, orders, notes]
   );
-  persistDb();
+  await persistDb();
   return row.lastID;
 }
 
@@ -1101,7 +1112,7 @@ async function saveApiToken(provider, data) {
      ON CONFLICT(provider) DO UPDATE SET data_json = excluded.data_json, updated_at = CURRENT_TIMESTAMP`,
     [provider, JSON.stringify(data)]
   );
-  persistDb();
+  await persistDb();
 }
 
 async function getApiToken(provider) {
@@ -1111,7 +1122,7 @@ async function getApiToken(provider) {
 
 async function deleteApiToken(provider) {
   const res = run('DELETE FROM api_tokens WHERE provider = ?', [provider]);
-  persistDb();
+  await persistDb();
   return res.changes > 0;
 }
 
@@ -1122,13 +1133,13 @@ async function createOauthState(provider) {
   const state = crypto.randomBytes(16).toString('hex');
   run('DELETE FROM oauth_states WHERE created_at < ?', [Date.now() - OAUTH_STATE_TTL_MS]);
   run('INSERT INTO oauth_states (state, provider, created_at) VALUES (?, ?, ?)', [state, provider, Date.now()]);
-  persistDb();
+  await persistDb();
   return state;
 }
 
 async function consumeOauthState(state, provider) {
   const row = get('SELECT provider, created_at AS createdAt FROM oauth_states WHERE state = ?', [state]);
-  if (row) { run('DELETE FROM oauth_states WHERE state = ?', [state]); persistDb(); }
+  if (row) { run('DELETE FROM oauth_states WHERE state = ?', [state]); await persistDb(); }
   if (!row || row.provider !== provider) return false;
   return Date.now() - Number(row.createdAt) < OAUTH_STATE_TTL_MS;
 }
@@ -1177,7 +1188,7 @@ async function consumeQuota({ userKey, metric, amount = 1, limit, windowMs, forc
      ON CONFLICT(user_key, metric) DO UPDATE SET window_start = excluded.window_start, used = excluded.used`,
     [userKey, metric, windowStart, next]
   );
-  persistDb();
+  await persistDb();
   return { allowed: true, used: next, limit, remaining: Math.max(0, limit - next), resetAt };
 }
 
