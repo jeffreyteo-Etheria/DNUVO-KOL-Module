@@ -1989,27 +1989,32 @@ function loadDemoRecommendStep(){
 function loadDemoBudgetKpiStep(){
   buildBudget(); // deterministic from S.setup.budget + tier counts set in loadDemoCreatorsStep()
 
-  document.getElementById('k-spend').value=4200;
-  document.getElementById('k-rev').value=9800;
-  document.getElementById('k-orders').value=126;
-  document.getElementById('k-leads').value=340;
-  document.getElementById('k-views').value=182000;
-  document.getElementById('k-clicks').value=5100;
+  // Latest checkpoint is the post-11.11-mega-sale peak — the payoff of the
+  // Setup periods selection and the calendar's LIVE co-host slot — clearing
+  // both KPI targets shown in the tile notes (ROAS >=3.5x at maturity, CPL <=S$3).
+  document.getElementById('k-spend').value=4800;
+  document.getElementById('k-rev').value=17500;
+  document.getElementById('k-orders').value=230;
+  document.getElementById('k-leads').value=1800;
+  document.getElementById('k-views').value=260000;
+  document.getElementById('k-clicks').value=7800;
   calcKPI();
 
   const day=n=>new Date(Date.now()+n*86400000).toISOString();
   S.kpiHistory=[
-    {createdAt:day(-14),spend:2600,revenue:5200,orders:68,metrics:{roas:2.0,ctr:2.8}},
-    {createdAt:day(-7),spend:3400,revenue:7100,orders:94,metrics:{roas:2.09,ctr:2.95}},
-    {createdAt:day(0),spend:4200,revenue:9800,orders:126,metrics:{roas:2.33,ctr:3.1}},
+    {createdAt:day(-21),spend:2600,revenue:5200,orders:68,metrics:{roas:2.0,ctr:2.65}},
+    {createdAt:day(-14),spend:3400,revenue:7100,orders:94,metrics:{roas:2.09,ctr:2.79}},
+    {createdAt:day(-7),spend:4200,revenue:9800,orders:126,metrics:{roas:2.33,ctr:2.8}},
+    {createdAt:day(0),spend:4800,revenue:17500,orders:230,metrics:{roas:3.65,ctr:3.0}},
   ];
   S.kpiLatest=S.kpiHistory[S.kpiHistory.length-1];
   renderKpiHistory();
   renderAuditTrail([
-    {createdAt:day(-14),action:'campaign.created',actor:AUTH.code?'advertiser':'jeffrey.teo@akadigital.net',details:{name:'DNUVO SG Q4 Launch (Demo)'}},
-    {createdAt:day(-10),action:'kpi.saved',actor:'jeffrey.teo@akadigital.net',details:{spend:2600,revenue:5200}},
+    {createdAt:day(-21),action:'campaign.created',actor:AUTH.code?'advertiser':'jeffrey.teo@akadigital.net',details:{name:'DNUVO SG Q4 Launch (Demo)'}},
+    {createdAt:day(-17),action:'kpi.saved',actor:'jeffrey.teo@akadigital.net',details:{spend:2600,revenue:5200}},
+    {createdAt:day(-10),action:'kpi.saved',actor:'jeffrey.teo@akadigital.net',details:{spend:3400,revenue:7100}},
     {createdAt:day(-3),action:'calendar_entry.created',actor:'jeffrey.teo@akadigital.net',details:{activityType:'ugc',creatorId:2}},
-    {createdAt:day(0),action:'kpi.saved',actor:'jeffrey.teo@akadigital.net',details:{spend:4200,revenue:9800}},
+    {createdAt:day(0),action:'kpi.saved',actor:'jeffrey.teo@akadigital.net',details:{spend:4800,revenue:17500}},
   ]);
 }
 
