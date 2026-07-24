@@ -171,6 +171,11 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
 <!-- ════════ STEP 0: SETUP ════════ -->
 <div class="pg on" id="pg-0">
   <div class="stitle">Campaign Setup — Answer Before Anything Generates</div>
+  <div class="ib ibg mb2">
+    <div class="ibl" style="color:#8A7000">New here? See a completed example first</div>
+    <div class="ibb">Every step below is locked until Setup is saved. Click "Load Demo Campaign" to instantly fill and unlock all seven steps — Setup, Creators, Content, Recommend, Budget · KPI, Pricing · Promo, and Creator Calendar — with a realistic DNUVO example, so you can see how each section should be filled in before starting your own. Nothing is saved until you click "Save Campaign Snapshot" yourself. (A persisted version also lives in "Load existing campaign" below as <strong>DNUVO — Model Campaign</strong>.)</div>
+    <button class="btn btn-gold mt" onclick="loadDemoCampaign()">▶ Load Demo Campaign</button>
+  </div>
   <div class="card mb2">
     <div class="card-hd">Flow Guide · Navigate In Order</div>
     <div class="ibb" style="line-height:1.8">
@@ -1165,7 +1170,7 @@ function renderAdvertiserPanel(){
           <button class="btn btn-outline btn-sm" style="border-color:var(--rs);color:var(--rs)" onclick="deleteAdvertiserRow(${a.id},'${a.brand.replace(/'/g,'&#39;')}')">Delete</button></td>
     </tr>`).join('');
   host.innerHTML = `
-    <div class="ib ibg mb"><div class="ibl" style="color:#8A7000">Super admin repository</div><div class="ibb">All advertisers registered under the SocialMIND master network. "Work under" selects which advertiser new campaigns are filed to; share the access code with the advertiser for their scoped login.</div></div>
+    <div class="ib ibg mb"><div class="ibl" style="color:#8A7000">Super admin repository</div><div class="ibb">All advertisers registered under the SocialMIND master network. "Work under" selects which advertiser new campaigns are filed to and which advertiser's data you're viewing. The access code is stored for reference but there's no separate advertiser login screen — every visitor to this dashboard has full super admin access.</div></div>
     <table class="dt mb"><thead><tr><th>Brand</th><th>Company</th><th>Access code</th><th>Context</th></tr></thead><tbody>${rows || '<tr><td colspan="4">No advertisers yet.</td></tr>'}</tbody></table>
     <div class="card-hd" style="margin-top:14px">Create New Advertiser</div>
     <div class="g3" style="gap:10px;align-items:end">
@@ -1242,7 +1247,7 @@ async function saveAdvertiserProfile(){
     const el = document.getElementById('adv-msg');
     el.innerHTML = isUpdate
       ? `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Advertiser profile saved</div><div class="ibb">${brand} updated. Logo now shows in the top-right advertiser menu.</div></div>`
-      : `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Advertiser created — new campaign set opened</div><div class="ibb">${brand} registered under SocialMIND and set as the active context: the workspace below is a fresh campaign set filed under ${brand}. Only super admin and this advertiser's own code can view or edit its campaigns.<br>Advertiser access code: <strong style="font-family:'JetBrains Mono',monospace">${data.advertiser.accessCode}</strong> — share this for their scoped login.</div></div>`;
+      : `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Advertiser created — new campaign set opened</div><div class="ibb">${brand} registered under SocialMIND and set as the active context: the workspace below is a fresh campaign set filed under ${brand}.<br>Reference code: <strong style="font-family:'JetBrains Mono',monospace">${data.advertiser.accessCode}</strong></div></div>`;
   }catch(e){
     msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Save failed</div><div class="ibb">${e.message}</div></div>`;
   }
@@ -1333,7 +1338,7 @@ HARD RULES:
 // ═══ RAIL / NAV ═══
 let unlocked = [true,false,false,false,false,false,false];
 function goStep(n){
-  if(!unlocked[n]){ alert('Complete Setup first to unlock this step.'); return; }
+  if(!unlocked[n]){ alert('Complete Setup first to unlock this step.\n\nNew here? Go to Setup and click "Load Demo Campaign" to see every step already filled in as a reference.'); return; }
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.getElementById('pg-'+n).classList.add('on');
   for(let i=0;i<7;i++){
