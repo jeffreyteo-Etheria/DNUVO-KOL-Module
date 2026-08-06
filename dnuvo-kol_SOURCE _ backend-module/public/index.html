@@ -1036,6 +1036,7 @@ async function api(path, opts={}){
 }
 
 async function bootDashboard(){
+  unlockAll();
   renderRolePill();
   await refreshAdvertisers();
   renderAdvertiserPanel();
@@ -1336,9 +1337,8 @@ HARD RULES:
 - Verdict before evidence. No em-dashes. SGD. Concise.`;
 
 // ═══ RAIL / NAV ═══
-let unlocked = [true,false,false,false,false,false,false];
+let unlocked = [true,true,true,true,true,true,true];
 function goStep(n){
-  if(!unlocked[n]){ alert('Complete Setup first to unlock this step.\n\nNew here? Go to Setup and click "Load Demo Campaign" to see every step already filled in as a reference.'); return; }
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.getElementById('pg-'+n).classList.add('on');
   for(let i=0;i<7;i++){
@@ -1358,15 +1358,14 @@ function unlockAll(){
 }
 
 function relockPipeline(){
-  unlocked=[true,false,false,false,false,false,false];
+  unlocked=[true,true,true,true,true,true,true];
   for(let i=0;i<7;i++){
     const node=document.getElementById('rn-'+i);
     node.classList.remove('done');
     node.classList.toggle('on', i===0);
   }
   for(let i=0;i<6;i++){ const rl=document.getElementById('rl-'+i); if(rl) rl.classList.remove('done'); }
-  const locks={1:'🔒 setup first',2:'🔒',3:'🔒',4:'🔒',5:'🔒',6:'🔒'};
-  Object.keys(locks).forEach((i)=>{ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=locks[i]; });
+  for(let i=1;i<7;i++){ const lk=document.getElementById('lk-'+i); if(lk) lk.textContent=''; }
 }
 
 // Fresh campaign set for a new advertiser context — clears every pipeline
@@ -1527,7 +1526,7 @@ function hydrateFromSnapshot(snapshot){
   S.manualCreators = snapshot.manualCreators || [];
   restorePricingState(snapshot.pricing);
   applySetupToUI();
-  if (S.setup) unlockAll();
+  unlockAll();
   if (S.budget && S.budget.length) renderBudgetTable(S.budget, S.setup.budget);
   document.getElementById('creators-output').innerHTML = S.creators
     ? `<div class="card"><div class="card-hd">Loaded Creator Candidates</div>${md(S.creators)}</div>`
