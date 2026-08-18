@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Media Planning &amp; Budget Mix · DNUVO / SocialMIND</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1E1D1A;--sl:#4F4C46;--ms:#8B887F;
+  --cr:#F2F1EF;--c1:#ECEBE8;--c2:#DCDAD5;--bd:#D5D3CD;--bd2:#C2BFB7;
+  --gd:#E39B00;--gl:#F2B200;--gdbg:#FFF3D1;
+  --or:#F07F13;--orbg:#FDE9D7;
+  --sg:#266040;--sgbg:#E0F0E8;--rs:#B03828;--rsbg:#FAEAE6;
+  --sk:#1A4888;--skbg:#E4EEF8;--tl:#186868;--tlbg:#DCF0F0;--pp:#502898;--ppbg:#EEE8F8;
+  --sh:0 1px 4px rgba(30,29,26,.07),0 4px 18px rgba(30,29,26,.09);
+  /* Validated categorical set for chart series identity (dataviz skill default
+     palette) — kept separate from the brand gold/orange UI tokens above,
+     which are reserved for KOL identity so it reads as its own track. */
+  --ch-1:#2a78d6;--ch-2:#eb6834;--ch-3:#1baf7a;--ch-4:#eda100;
+  --ch-5:#e87ba4;--ch-6:#008300;--ch-7:#4a3aa7;--ch-8:#e34948;
+  --kol-color:#F07F13;
+  --st-good:#0ca30c;--st-warn:#fab219;--st-serious:#ec835a;--st-crit:#d03b3b;--st-muted:#8B887F;
+}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--c1)}::-webkit-scrollbar-thumb{background:var(--c2);border-radius:2px}
+body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-height:100vh;font-size:13px;display:flex}
+
+/* ── App shell: sidebar + main ─────────────────────────────────────────── */
+.sidebar{width:236px;flex:none;background:linear-gradient(165deg,#26241F 0%,#3A372F 70%,#4A4238 130%);color:#FAF8F2;min-height:100vh;position:sticky;top:0;display:flex;flex-direction:column;padding:18px 14px}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:4px 6px 16px}
+.sb-gem{width:26px;height:26px;background:linear-gradient(135deg,#FFC72C,#F07F13);clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);flex:none}
+.sb-name{font-family:"Space Grotesk",sans-serif;font-size:14px;font-weight:700;line-height:1.2}
+.sb-name em{color:#FFC72C;font-style:normal}
+.sb-sub{font-size:8.5px;text-transform:uppercase;letter-spacing:.14em;color:rgba(250,248,242,.7);margin-top:2px}
+.sb-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:rgba(250,248,242,.5);margin:14px 8px 6px}
+.sb-nav{display:flex;flex-direction:column;gap:2px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;background:none;border:none;color:rgba(250,248,242,.82);font-family:"Inter",sans-serif;font-size:12.5px;font-weight:600;text-align:left;cursor:pointer;transition:background .15s,color .15s}
+.sb-item:hover{background:rgba(255,255,255,.07)}
+.sb-item.on{background:linear-gradient(135deg,rgba(242,178,0,.24),rgba(240,127,19,.2));color:#FFE8A8}
+.sb-item[disabled]{opacity:.35;cursor:not-allowed}
+.sb-ico{width:16px;text-align:center;flex:none;font-size:12.5px}
+.sb-proj{margin:4px 6px 10px;padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+.sb-proj label{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:rgba(250,248,242,.55);margin-bottom:4px}
+.sb-proj select{width:100%;padding:6px 7px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.2);color:#FAF8F2;font-size:11.5px}
+.sb-foot{margin-top:auto;padding:8px 8px 2px;font-size:9.5px;color:rgba(250,248,242,.45);line-height:1.6}
+.sb-foot a{color:#FFE8A8;text-decoration:none}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:#fff;border-bottom:1px solid var(--bd);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;gap:12px;flex-wrap:wrap}
+.tb-title{font-family:"Playfair Display",serif;font-size:16px;font-weight:700}
+.tb-title .muted{color:var(--ms);font-family:"Inter",sans-serif;font-size:11px;font-weight:500;display:block;margin-top:1px}
+.tb-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{padding:4px 10px;border-radius:20px;font-size:9.5px;font-weight:700;border:1px solid var(--bd2);color:var(--sl);background:#fff}
+.pill-adv{display:flex;align-items:center;gap:6px}
+.pill-adv img{height:14px}
+
+.pg{display:none;padding:22px 26px 60px;max-width:1280px;width:100%;margin:0 auto}
+.pg.on{display:block}
+
+/* ── Shared components (reused from the KOL wizard's design language) ───── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.mb{margin-bottom:13px}.mb2{margin-bottom:20px}.mt{margin-top:10px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:16px;box-shadow:var(--sh)}
+.card-hd{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--sl);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.stitle{font-family:"Playfair Display",serif;font-size:18px;font-weight:700;margin-bottom:4px}
+.ssub{font-size:11.5px;color:var(--sl);margin-bottom:16px;line-height:1.6}
+.fld{margin-bottom:12px}
+.fld label{display:block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--sl);margin-bottom:4px}
+.fld input,.fld textarea,.fld select{width:100%;padding:9px 12px;border:1px solid var(--bd2);border-radius:7px;font-family:"Inter",sans-serif;font-size:12.5px;color:var(--ink);background:#fff;outline:none}
+.fld input:focus,.fld textarea:focus,.fld select:focus{border-color:var(--gd);box-shadow:0 0 0 3px rgba(242,178,0,.12)}
+.fld textarea{min-height:56px;resize:vertical;line-height:1.6}
+.req::after{content:" *";color:var(--rs)}
+.btn{padding:9px 18px;border-radius:7px;font-family:"Inter",sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn-gold{background:linear-gradient(135deg,#F2B200,#F07F13);color:#1E1D1A}
+.btn-gold:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(240,127,19,.32)}
+.btn-outline{background:transparent;border:1px solid var(--bd2);color:var(--sl)}
+.btn-outline:hover{border-color:var(--gd);color:var(--gd)}
+.btn-sm{padding:5px 11px;font-size:10.5px}
+.btn-danger{background:transparent;border:1px solid var(--rs);color:var(--rs)}
+.ib{padding:10px 13px;border-radius:7px;margin-bottom:8px}
+.ib:last-child{margin-bottom:0}
+.ibg{background:var(--gdbg);border-left:3px solid var(--gd)}
+.ibs{background:var(--sgbg);border-left:3px solid var(--sg)}
+.ibr{background:var(--rsbg);border-left:3px solid var(--rs)}
+.ibl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.ibb{font-size:12px;line-height:1.7;color:#2E2416}
+.dt{width:100%;border-collapse:collapse}
+.dt th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--sl);padding:8px 10px;border-bottom:1px solid var(--bd2);background:var(--c1);text-align:left;white-space:nowrap}
+.dt td{padding:8px 10px;border-bottom:1px solid var(--bd);font-size:11.5px;color:var(--sl);vertical-align:middle}
+.dt tr:last-child td{border-bottom:none}
+.dt tr.clickable{cursor:pointer}
+.dt tr.clickable:hover{background:var(--c1)}
+.empty{border:2px dashed var(--bd2);border-radius:10px;padding:36px 24px;text-align:center;color:var(--ms)}
+.empty h4{font-family:"Playfair Display",serif;font-size:15px;color:var(--sl);margin-bottom:6px}
+.empty p{font-size:11.5px;line-height:1.7;max-width:440px;margin:0 auto}
+.kpi{background:#fff;border:1px solid var(--bd);border-radius:9px;padding:13px 15px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.kpi::after{content:"";position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--gd)}
+.klbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--sl);margin-bottom:4px}
+.kval{font-family:"Playfair Display",serif;font-size:23px;font-weight:700;line-height:1}
+.knote{font-size:10px;color:var(--ms);margin-top:4px}
+.spinner{width:24px;height:24px;border:3px solid var(--c2);border-top-color:var(--gd);border-radius:50%;animation:spin .7s linear infinite;margin:20px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* status pill: colored dot (icon) + text kept in ink tokens, never colored text alone */
+.status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;background:var(--c1);color:var(--sl);border:1px solid var(--bd2);white-space:nowrap}
+.status-dot{width:7px;height:7px;border-radius:50%;flex:none}
+
+/* channel swatch chip */
+.ch-chip{display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--ink)}
+.ch-swatch{width:10px;height:10px;border-radius:3px;flex:none}
+
+/* planned vs actual bar — CSS progress bar, per dataviz skill: thin marks,
+   rounded data-ends, direct labels for the sub-3:1 lighter hues */
+.mixrow{display:grid;grid-template-columns:150px 1fr 168px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--bd)}
+.mixrow:last-child{border-bottom:none}
+.mix-track{height:16px;background:var(--c1);border-radius:8px;position:relative;overflow:hidden}
+.mix-fill{height:100%;border-radius:8px;transition:width .3s}
+.mix-planned-edge{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+.mix-figs{font-size:10.5px;color:var(--sl);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* modal */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(20,18,14,.5);z-index:200;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.modal-backdrop.on{display:flex}
+.modal{background:#fff;border-radius:12px;max-width:640px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.modal-hd h3{font-family:"Playfair Display",serif;font-size:17px}
+.modal-x{background:none;border:none;font-size:20px;cursor:pointer;color:var(--ms);line-height:1}
+.modal-section{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gd);margin:16px 0 8px;padding-top:10px;border-top:1px solid var(--bd)}
+.modal-section:first-of-type{border-top:none;margin-top:0}
+.chk-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}
+.chk-line{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--sl)}
+.chk-line input[type=checkbox]{width:15px;height:15px;accent-color:var(--gd)}
+
+@media (max-width:900px){
+  body{flex-direction:column}
+  .sidebar{width:100%;position:relative;min-height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
+  .sb-brand{padding:4px 10px 4px 0}
+  .sb-nav{flex-direction:row;flex-wrap:wrap}
+  .sb-section{display:none}
+  .sb-proj{margin:4px 0;flex:1 1 200px}
+  .sb-foot{display:none}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .mixrow{grid-template-columns:1fr;gap:4px}
+  .mix-figs{text-align:left}
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-gem"></div>
+    <div>
+      <div class="sb-name"><em>Media Planning</em></div>
+      <div class="sb-sub">DNUVO · SocialMIND network</div>
+    </div>
+  </div>
+
+  <div class="sb-nav">
+    <button class="sb-item" data-page="dashboard" onclick="setPage('dashboard')"><span class="sb-ico">◆</span> Dashboard</button>
+    <button class="sb-item" data-page="projects" onclick="setPage('projects')"><span class="sb-ico">▤</span> Projects / Campaigns</button>
+  </div>
+
+  <div class="sb-section">Current Project</div>
+  <div class="sb-proj">
+    <label>Working on</label>
+    <select id="project-switcher" onchange="selectProject(this.value||null)">
+      <option value="">Select a project...</option>
+    </select>
+  </div>
+
+  <div class="sb-nav">
+    <button class="sb-item" data-page="overview" onclick="setPage('overview')"><span class="sb-ico">◎</span> Overview</button>
+    <button class="sb-item" data-page="mediaplan" onclick="setPage('mediaplan')"><span class="sb-ico">▦</span> Media Plan</button>
+    <button class="sb-item" data-page="channels" onclick="setPage('channels')"><span class="sb-ico">▥</span> Channels</button>
+    <button class="sb-item" data-page="tracking" onclick="setPage('tracking')"><span class="sb-ico">◈</span> Tracking Implementation</button>
+    <button class="sb-item" data-page="performance" onclick="setPage('performance')"><span class="sb-ico">▲</span> Performance</button>
+    <button class="sb-item" data-page="kolhub" onclick="setPage('kolhub')"><span class="sb-ico">★</span> KOL Hub</button>
+  </div>
+
+  <div class="sb-foot">Backend: <span id="api-status">checking...</span><br><a href="../index.html">Open KOL Wizard →</a></div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div class="tb-title">Media Planning &amp; Budget Mix<span class="muted" id="tb-context">No project selected</span></div>
+    <div class="tb-r">
+      <div class="pill pill-adv" id="adv-pill" style="display:none"><img id="adv-pill-logo" src="" alt="" style="display:none"><span id="adv-pill-name"></span></div>
+      <div class="pill" id="role-pill" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ═══ DASHBOARD ═══ -->
+  <div class="pg on" id="pg-dashboard">
+    <div class="stitle">Dashboard</div>
+    <div class="ssub">Every project's paid-media + KOL budget mix at a glance — what's planned, what's live, and what still needs tracking set up.</div>
+    <div class="g4 mb2" id="dash-kpis"><div class="spinner"></div></div>
+    <div class="card mb2">
+      <div class="card-hd">Needs Action</div>
+      <div id="dash-actions"><div class="spinner"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">All Projects <button class="btn btn-gold btn-sm" onclick="openNewProjectModal()">+ New Project</button></div>
+      <div id="dash-projects"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- ═══ PROJECTS ═══ -->
+  <div class="pg" id="pg-projects">
+    <div class="stitle">Projects / Campaigns</div>
+    <div class="ssub">One project = one campaign, shared with the KOL Hub — paid-media and KOL budgets both roll up to the same record.</div>
+    <div class="card mb2">
+      <div class="card-hd">
+        Filter
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="proj-filter-adv" onchange="renderProjectsPage()" style="padding:6px 9px;border:1px solid var(--bd2);border-radius:6px;font-size:11.5px"></select>
+          <button class="btn btn-gold btn-sm" onclick="openNewProjectModal()">+ New Project</button>
+        </div>
+      </div>
+      <div id="projects-table"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- ═══ OVERVIEW (project-scoped) ═══ -->
+  <div class="pg" id="pg-overview"></div>
+
+  <!-- ═══ MEDIA PLAN (project-scoped) ═══ -->
+  <div class="pg" id="pg-mediaplan"></div>
+
+  <!-- ═══ CHANNELS (project-scoped) ═══ -->
+  <div class="pg" id="pg-channels"></div>
+
+  <!-- ═══ TRACKING (project-scoped) ═══ -->
+  <div class="pg" id="pg-tracking"></div>
+
+  <!-- ═══ PERFORMANCE (project-scoped) ═══ -->
+  <div class="pg" id="pg-performance"></div>
+
+  <!-- ═══ KOL HUB (project-scoped) ═══ -->
+  <div class="pg" id="pg-kolhub"></div>
+</div>
+
+<!-- Shared modal (New Project / Add Channels / Edit Channel) -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// Channel catalog — data-driven so new channels/APIs slot in without
+// touching any render function. Colors are the validated 8-hue categorical
+// set (dataviz skill default palette), assigned in this fixed order so
+// adjacent-pair colorblind-safety holds; KOL keeps the brand gold/orange
+// track already used for it throughout the KOL wizard, deliberately outside
+// this set so it always reads as a distinct budget track.
+// ═══════════════════════════════════════════════════════════════════════
+const CHANNEL_CATALOG = [
+  {id:'google_search',    label:'Google Search & Display Ads',        group:'Google',      color:'var(--ch-1)'},
+  {id:'google_shopping',  label:'Google Shopping Ads (Shopify feed)', group:'Google',      color:'var(--ch-2)'},
+  {id:'meta_ads',         label:'Meta Ads (Facebook / Instagram)',    group:'Meta',        color:'var(--ch-3)'},
+  {id:'tiktok_ads',       label:'TikTok Ads',                         group:'TikTok',      color:'var(--ch-4)'},
+  {id:'tiktok_shop_ads',  label:'TikTok Shop Ads',                    group:'TikTok',      color:'var(--ch-5)'},
+  {id:'linkedin_ads',     label:'LinkedIn Ads',                       group:'LinkedIn',    color:'var(--ch-6)'},
+  {id:'lazada_ads',       label:'Lazada Sponsored Ads',               group:'Marketplace', color:'var(--ch-7)'},
+  {id:'shopee_ads',       label:'Shopee Ads',                         group:'Marketplace', color:'var(--ch-8)'},
+];
+const CHANNEL_MAP = Object.fromEntries(CHANNEL_CATALOG.map(c => [c.id, c]));
+function channelInfo(id){ return CHANNEL_MAP[id] || {id, label:id, group:'Other', color:'var(--ms)'}; }
+
+const CHANNEL_STATUS = {
+  planned:   {label:'Planned',   tone:'muted'},
+  live:      {label:'Live',      tone:'good'},
+  paused:    {label:'Paused',    tone:'warn'},
+  completed: {label:'Completed', tone:'muted'},
+};
+const TRACK_STATUS = {
+  not_started: {label:'Not started', tone:'muted'},
+  in_progress: {label:'In progress', tone:'warn'},
+  live:        {label:'Live',        tone:'serious'},
+  verified:    {label:'Verified',    tone:'good'},
+};
+const TONE_HEX = {good:'var(--st-good)', warn:'var(--st-warn)', serious:'var(--st-serious)', crit:'var(--st-crit)', muted:'var(--st-muted)'};
+
+function statusPill(map, key){
+  const s = map[key] || {label:key||'—', tone:'muted'};
+  return `<span class="status-pill"><span class="status-dot" style="background:${TONE_HEX[s.tone]}"></span>${escHtml(s.label)}</span>`;
+}
+function statusOptions(map, selected){
+  return Object.entries(map).map(([k,v]) => `<option value="${k}" ${k===selected?'selected':''}>${v.label}</option>`).join('');
+}
+
+// ═══ Auth / state (mirrors the KOL wizard's boot contract) ═══
+let CID = localStorage.getItem('sm_cid');
+if(!CID){ CID = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2)); localStorage.setItem('sm_cid', CID); }
+const AUTH = { code:'', role:null, advertiser:null, advertisers:[], activeAdvertiserId:null };
+
+const S = {
+  page:'dashboard',
+  projects:[],
+  activeProjectId:null,
+  activeProject:null,
+  channels:[],
+  budgetMix:null,
+};
+
+function escHtml(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function fmt(n){ return 'S$' + Math.round(Number(n||0)).toLocaleString(); }
+function pct(a,b){ return b>0 ? Math.min(100, Math.round(a/b*100)) : 0; }
+
+async function api(path, opts={}){
+  const r = await fetch(path, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type':'application/json', 'x-access-code': AUTH.code || '', 'x-client-id': CID, ...(opts.headers||{}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
+  return data;
+}
+
+async function checkBackend(){
+  try{ await fetch('/health'); document.getElementById('api-status').textContent = 'connected'; }
+  catch(_){ document.getElementById('api-status').textContent = 'unreachable'; }
+}
+
+// ═══ Navigation ═══
+const PROJECT_SCOPED = new Set(['overview','mediaplan','channels','tracking','performance','kolhub']);
+function setPage(page){
+  S.page = page;
+  document.querySelectorAll('.sb-item').forEach(b => b.classList.toggle('on', b.dataset.page === page));
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+  document.getElementById('pg-'+page).classList.add('on');
+  if(PROJECT_SCOPED.has(page) && !S.activeProjectId){
+    document.getElementById('pg-'+page).innerHTML = `<div class="stitle">${pageTitle(page)}</div><div class="empty"><h4>No project selected</h4><p>Pick a project from the switcher in the sidebar, or create one from the Projects page, to see its ${pageTitle(page).toLowerCase()}.</p><button class="btn btn-gold mt" onclick="setPage('projects')">Go to Projects</button></div>`;
+    return;
+  }
+  if(page==='dashboard') renderDashboard();
+  else if(page==='projects') renderProjectsPage();
+  else if(page==='overview') renderOverview();
+  else if(page==='mediaplan') renderMediaPlan();
+  else if(page==='channels') renderChannelsPage();
+  else if(page==='tracking') renderTracking();
+  else if(page==='performance') renderPerformance();
+  else if(page==='kolhub') renderKolHub();
+}
+function pageTitle(page){
+  return {overview:'Overview', mediaplan:'Media Plan', channels:'Channels', tracking:'Tracking Implementation', performance:'Performance', kolhub:'KOL Hub'}[page] || page;
+}
+
+// ═══ Boot ═══
+async function boot(){
+  checkBackend();
+  setInterval(checkBackend, 30000);
+  try{
+    const data = await api('/auth/login', { method:'POST', body:{ accessCode:'' } });
+    AUTH.role = data.role;
+    AUTH.advertiser = data.advertiser || null;
+    document.getElementById('role-pill').style.display = '';
+    document.getElementById('role-pill').textContent = AUTH.role === 'superadmin' ? 'SUPER ADMIN · All advertisers' : `Advertiser · ${AUTH.advertiser?.brand||''}`;
+    await refreshAdvertisers();
+    renderAdvertiserPill();
+    await refreshProjects();
+    const qp = new URLSearchParams(location.search);
+    const pid = qp.get('projectId') || qp.get('campaignId');
+    if(pid){ history.replaceState(null,'',location.pathname); await selectProject(Number(pid)); setPage('overview'); return; }
+    setPage('dashboard');
+  }catch(e){
+    document.getElementById('api-status').textContent = `error — ${e.message}`;
+  }
+}
+
+async function refreshAdvertisers(){
+  try{
+    const data = await api('/advertisers');
+    AUTH.advertisers = data.items || [];
+    if(AUTH.role === 'advertiser'){
+      AUTH.advertiser = AUTH.advertisers[0] || AUTH.advertiser;
+      AUTH.activeAdvertiserId = AUTH.advertiser?.id || null;
+    } else if(!AUTH.activeAdvertiserId && AUTH.advertisers.length){
+      AUTH.activeAdvertiserId = AUTH.advertisers[0].id;
+    }
+  }catch(_){ AUTH.advertisers = []; }
+}
+function activeAdvertiser(){
+  if(AUTH.role === 'advertiser') return AUTH.advertiser;
+  return AUTH.advertisers.find(a => a.id === AUTH.activeAdvertiserId) || null;
+}
+function renderAdvertiserPill(){
+  const adv = activeAdvertiser();
+  const pill = document.getElementById('adv-pill');
+  if(!adv){ pill.style.display = 'none'; return; }
+  pill.style.display = '';
+  document.getElementById('adv-pill-name').textContent = adv.brand;
+  const logo = document.getElementById('adv-pill-logo');
+  if(adv.logo){ logo.src = adv.logo; logo.style.display = ''; } else logo.style.display = 'none';
+}
+
+// ═══ Projects (= campaigns) ═══
+async function refreshProjects(){
+  const data = await api('/campaigns');
+  S.projects = data.items || [];
+  renderProjectSwitcher();
+}
+function renderProjectSwitcher(){
+  // Lists every project the caller can see (not filtered to one advertiser at
+  // a time) — this dashboard has no "work under X advertiser" control like the
+  // KOL wizard does, so filtering here would silently hide other advertisers'
+  // projects with no way back in. The Projects page's advertiser filter is the
+  // explicit, visible way to narrow the view; the sidebar switcher stays global.
+  const sel = document.getElementById('project-switcher');
+  sel.innerHTML = '<option value="">Select a project...</option>' +
+    S.projects.map(p => `<option value="${p.id}" ${p.id===S.activeProjectId?'selected':''}>#${p.id} · ${escHtml(p.name)}${p.advertiserBrand?` (${escHtml(p.advertiserBrand)})`:''}</option>`).join('');
+}
+
+async function selectProject(id){
+  if(!id){ S.activeProjectId = null; S.activeProject = null; S.channels = []; S.budgetMix = null; updateContextLabel(); return; }
+  id = Number(id);
+  S.activeProjectId = id;
+  const [campaign, channelsData] = await Promise.all([
+    api(`/campaigns/${id}`),
+    api(`/media-plan-channels?campaignId=${id}`),
+  ]);
+  S.activeProject = campaign;
+  S.channels = channelsData.items || [];
+  S.budgetMix = await api(`/campaigns/${id}/budget-mix`);
+  document.getElementById('project-switcher').value = String(id);
+  updateContextLabel();
+  if(PROJECT_SCOPED.has(S.page)) setPage(S.page);
+}
+function updateContextLabel(){
+  document.getElementById('tb-context').textContent = S.activeProject ? `${S.activeProject.name} · ${S.activeProject.status || 'draft'}` : 'No project selected';
+}
+async function refreshActiveProjectData(){
+  if(!S.activeProjectId) return;
+  const id = S.activeProjectId;
+  const [campaign, channelsData, mix] = await Promise.all([
+    api(`/campaigns/${id}`),
+    api(`/media-plan-channels?campaignId=${id}`),
+    api(`/campaigns/${id}/budget-mix`),
+  ]);
+  S.activeProject = campaign; S.channels = channelsData.items || []; S.budgetMix = mix;
+  updateContextLabel();
+}
+
+// ═══ Modal helpers ═══
+function openModal(html){
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-backdrop').classList.add('on');
+}
+function closeModal(){ document.getElementById('modal-backdrop').classList.remove('on'); }
+document.getElementById('modal-backdrop').addEventListener('click', (e) => { if(e.target.id==='modal-backdrop') closeModal(); });
+
+// ═══════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════
+async function renderDashboard(){
+  const kpiEl = document.getElementById('dash-kpis');
+  const actionsEl = document.getElementById('dash-actions');
+  const projEl = document.getElementById('dash-projects');
+  kpiEl.innerHTML = '<div class="spinner"></div>';
+  actionsEl.innerHTML = '<div class="spinner"></div>';
+  projEl.innerHTML = '<div class="spinner"></div>';
+
+  const projects = S.projects;
+  if(!projects.length){
+    kpiEl.innerHTML = '';
+    actionsEl.innerHTML = '<div class="empty"><h4>Nothing to review yet</h4><p>Create your first project to start planning paid-media and KOL budget together.</p></div>';
+    projEl.innerHTML = '<div class="empty"><h4>No projects yet</h4><p>Click "+ New Project" to set objectives, budget, dates and audience for your first campaign.</p></div>';
+    return;
+  }
+
+  const mixes = await Promise.all(projects.map(p => api(`/campaigns/${p.id}/budget-mix`).catch(() => null)));
+  const channelLists = await Promise.all(projects.map(p => api(`/media-plan-channels?campaignId=${p.id}`).then(d=>d.items||[]).catch(() => [])));
+
+  let totalPlanned = 0, totalActual = 0, needsAction = 0;
+  const today = new Date().toISOString().slice(0,10);
+  const actionItems = [];
+
+  projects.forEach((p, i) => {
+    const mix = mixes[i];
+    if(mix){ totalPlanned += mix.totals.planned; totalActual += mix.totals.actual; }
+    (channelLists[i]||[]).forEach(c => {
+      const trackingIncomplete = c.pixelStatus!=='verified' || c.ga4Status!=='verified' || c.gtmStatus!=='verified';
+      const overdueStart = c.status==='planned' && c.startDate && c.startDate < today;
+      if((c.status==='live' && trackingIncomplete) || overdueStart){
+        needsAction++;
+        actionItems.push({project:p, channel:c, reason: overdueStart ? 'Start date passed, still marked Planned' : 'Live but tracking not fully verified'});
+      }
+    });
+  });
+
+  kpiEl.innerHTML = `
+    <div class="kpi"><div class="klbl">Projects</div><div class="kval">${projects.length}</div><div class="knote">across ${new Set(projects.map(p=>p.advertiserId)).size} advertiser(s)</div></div>
+    <div class="kpi"><div class="klbl">Total Planned</div><div class="kval">${fmt(totalPlanned)}</div><div class="knote">paid media + KOL + production + contingency</div></div>
+    <div class="kpi"><div class="klbl">Total Actual / Committed</div><div class="kval">${fmt(totalActual)}</div><div class="knote">${pct(totalActual,totalPlanned)}% of planned</div></div>
+    <div class="kpi"><div class="klbl">Needs Action</div><div class="kval">${needsAction}</div><div class="knote">channel(s) across all projects</div></div>`;
+
+  actionsEl.innerHTML = actionItems.length ? `<table class="dt"><thead><tr><th>Project</th><th>Channel</th><th>Issue</th><th></th></tr></thead><tbody>${
+    actionItems.map(a => `<tr>
+      <td>${escHtml(a.project.name)}</td>
+      <td><span class="ch-chip"><span class="ch-swatch" style="background:${channelInfo(a.channel.channel).color}"></span>${escHtml(channelInfo(a.channel.channel).label)}</span></td>
+      <td>${escHtml(a.reason)}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="selectProject(${a.project.id}).then(()=>setPage('tracking'))">Fix →</button></td>
+    </tr>`).join('')
+  }</tbody></table>` : `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">All clear</div><div class="ibb">No live channels are missing tracking, and nothing planned is overdue.</div></div>`;
+
+  projEl.innerHTML = renderProjectsTable(projects, mixes);
+}
+
+function renderProjectsTable(projects, mixesMaybe){
+  if(!projects.length) return '<div class="empty"><h4>No projects yet</h4><p>Click "+ New Project" to get started.</p></div>';
+  const rows = projects.map((p, i) => {
+    const mix = mixesMaybe ? mixesMaybe[i] : null;
+    return `<tr class="clickable" onclick="selectProject(${p.id}).then(()=>setPage('overview'))">
+      <td><strong>${escHtml(p.name)}</strong></td>
+      <td>${escHtml(p.advertiserBrand||'—')}</td>
+      <td><span class="status-pill"><span class="status-dot" style="background:${p.status==='active'?TONE_HEX.good:TONE_HEX.muted}"></span>${escHtml(p.status||'draft')}</span></td>
+      <td>${mix ? fmt(mix.totals.planned) : '—'}</td>
+      <td>${mix ? fmt(mix.totals.actual) : '—'}</td>
+      <td>${new Date(p.updatedAt).toLocaleDateString()}</td>
+    </tr>`;
+  }).join('');
+  return `<table class="dt"><thead><tr><th>Project</th><th>Advertiser</th><th>Status</th><th>Planned</th><th>Actual</th><th>Updated</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PROJECTS PAGE
+// ═══════════════════════════════════════════════════════════════════════
+function renderProjectsPage(){
+  const advSel = document.getElementById('proj-filter-adv');
+  if(AUTH.role === 'superadmin'){
+    advSel.style.display = '';
+    advSel.innerHTML = '<option value="">All advertisers</option>' + AUTH.advertisers.map(a => `<option value="${a.id}" ${a.id===AUTH.activeAdvertiserId?'selected':''}>${escHtml(a.brand)}</option>`).join('');
+  } else {
+    advSel.style.display = 'none';
+  }
+  const filterId = advSel.value ? Number(advSel.value) : null;
+  const filtered = filterId ? S.projects.filter(p => p.advertiserId === filterId) : S.projects;
+  document.getElementById('projects-table').innerHTML = renderProjectsTable(filtered, null);
+  // Backfill planned/actual asynchronously so the table isn't blocked on N requests.
+  Promise.all(filtered.map(p => api(`/campaigns/${p.id}/budget-mix`).catch(() => null))).then(mixes => {
+    if(document.getElementById('pg-projects').classList.contains('on')){
+      document.getElementById('projects-table').innerHTML = renderProjectsTable(filtered, mixes);
+    }
+  });
+}
+
+function openNewProjectModal(){
+  const advOptions = AUTH.role === 'superadmin'
+    ? `<div class="fld"><label class="req">Advertiser</label><select id="np-adv">${AUTH.advertisers.map(a=>`<option value="${a.id}" ${a.id===AUTH.activeAdvertiserId?'selected':''}>${escHtml(a.brand)}</option>`).join('')}</select></div>`
+    : '';
+  openModal(`
+    <div class="modal-hd"><h3>New Project</h3><button class="modal-x" onclick="closeModal()">&times;</button></div>
+    ${advOptions}
+    <div class="fld"><label class="req">Project name</label><input id="np-name" placeholder="e.g. DNUVO SG Q4 Always-On"></div>
+    <div class="g2">
+      <div class="fld"><label class="req">Total budget (SGD)</label><input id="np-budget" type="number" placeholder="e.g. 30000"></div>
+      <div class="fld"><label>Market / location</label><input id="np-loc" placeholder="Singapore" value="Singapore"></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="req">Start date</label><input id="np-start" type="date"></div>
+      <div class="fld"><label class="req">End date</label><input id="np-end" type="date"></div>
+    </div>
+    <div class="fld"><label>Objective</label><input id="np-objective" placeholder="e.g. Drive 11.11 Vitamin C Ampoule sales across paid + KOL"></div>
+    <div class="fld"><label>Target audience</label><textarea id="np-audience" placeholder="e.g. Women 22-35 in Singapore, acne-prone/sensitive skin, compares K-beauty efficacy and value."></textarea></div>
+    <div class="modal-section">Budget split intent (optional — feeds the central budget mix; must total 100%)</div>
+    <div class="g4">
+      <div class="fld" style="margin:0"><label>KOL %</label><input id="np-pct-kol" type="number" value="45"></div>
+      <div class="fld" style="margin:0"><label>Paid media %</label><input id="np-pct-paid" type="number" value="30"></div>
+      <div class="fld" style="margin:0"><label>Production %</label><input id="np-pct-prod" type="number" value="15"></div>
+      <div class="fld" style="margin:0"><label>Contingency %</label><input id="np-pct-cont" type="number" value="10"></div>
+    </div>
+    <div id="np-msg" class="mt"></div>
+    <div class="mt" style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="createProject()">Create Project</button>
+    </div>
+  `);
+}
+
+async function createProject(){
+  const msg = document.getElementById('np-msg');
+  const name = document.getElementById('np-name').value.trim();
+  const budget = +document.getElementById('np-budget').value || 0;
+  const loc = document.getElementById('np-loc').value.trim();
+  const dateStart = document.getElementById('np-start').value;
+  const dateEnd = document.getElementById('np-end').value;
+  const objective = document.getElementById('np-objective').value.trim();
+  const audience = document.getElementById('np-audience').value.trim();
+  const kolPct = +document.getElementById('np-pct-kol').value || 0;
+  const paidPct = +document.getElementById('np-pct-paid').value || 0;
+  const prodPct = +document.getElementById('np-pct-prod').value || 0;
+  const contPct = +document.getElementById('np-pct-cont').value || 0;
+  const advSel = document.getElementById('np-adv');
+  const advertiserId = advSel ? Number(advSel.value) : AUTH.advertiser?.id;
+
+  const missing = [];
+  if(!name) missing.push('project name'); if(!budget) missing.push('budget'); if(!dateStart||!dateEnd) missing.push('dates');
+  if(missing.length){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Missing required fields</div><div class="ibb">${missing.join(' · ')}</div></div>`; return; }
+  const totalPct = kolPct+paidPct+prodPct+contPct;
+  if(totalPct !== 100){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Budget split must total 100%</div><div class="ibb">Current total: ${totalPct}%.</div></div>`; return; }
+
+  const setup = {
+    budget, loc, dateStart, dateEnd, objective, audience,
+    budgetPlan:{ kolPct, paidPct, prodPct, contPct,
+      kolAmount:Math.round(budget*kolPct/100), paidAmount:Math.round(budget*paidPct/100),
+      prodAmount:Math.round(budget*prodPct/100), contAmount:Math.round(budget*contPct/100) },
+  };
+  try{
+    const data = await api('/campaigns/save', { method:'POST', body:{ advertiserId, name, status:'active', snapshot:{ setup } } });
+    closeModal();
+    await refreshProjects();
+    await selectProject(data.campaign.id);
+    setPage('overview');
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Could not create project</div><div class="ibb">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+// Persists a partial change to setup while preserving every other snapshot
+// field already saved by the KOL wizard (creators/content/budget/schedule/
+// verifications/manualCreators/pricing) — a blind overwrite here would wipe
+// that data, since POST /campaigns/save replaces the full row.
+async function patchProjectSetup(patch){
+  const current = S.activeProject;
+  const setup = { ...(current.snapshot.setup || {}), ...patch };
+  const data = await api('/campaigns/save', {
+    method:'POST',
+    body:{ id: current.id, advertiserId: current.advertiserId, name: current.name, status: current.status,
+      snapshot:{ ...current.snapshot, setup } },
+  });
+  S.activeProject = data.campaign;
+  return data.campaign;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// OVERVIEW — the orchestrator: objectives, audience, dates, central budget mix
+// ═══════════════════════════════════════════════════════════════════════
+function budgetMixRows(mix){
+  const rows = [];
+  const maxVal = Math.max(1, mix.totals.planned, mix.totals.actual);
+  const row = (label, color, planned, actual) => {
+    const fillPct = pct(actual, maxVal);
+    const plannedPct = pct(planned, maxVal);
+    const over = actual > planned && planned > 0;
+    rows.push(`<div class="mixrow">
+      <div class="ch-chip"><span class="ch-swatch" style="background:${color}"></span>${escHtml(label)}</div>
+      <div class="mix-track"><div class="mix-fill" style="width:${fillPct}%;background:${color}${over?';box-shadow:inset 0 0 0 2px var(--st-crit)':''}"></div><div class="mix-planned-edge" style="left:${plannedPct}%"></div></div>
+      <div class="mix-figs">${fmt(actual)} of ${fmt(planned)} planned</div>
+    </div>`);
+  };
+  row('KOL / Creators', 'var(--kol-color)', mix.kol.planned, mix.kol.committed);
+  mix.channels.forEach(c => row(channelInfo(c.channel).label, channelInfo(c.channel).color, c.budgetPlanned, c.budgetActual));
+  if(mix.production.planned) row('Production / Editing', 'var(--ms)', mix.production.planned, 0);
+  if(mix.contingency.planned) row('Contingency', 'var(--ms)', mix.contingency.planned, 0);
+  return rows.join('') || '<div class="empty"><h4>No budget mix yet</h4><p>Add channels in Media Plan and set the KOL budget split to see the mix here.</p></div>';
+}
+
+function renderOverview(){
+  const p = S.activeProject, mix = S.budgetMix, setup = p.snapshot.setup || {};
+  document.getElementById('pg-overview').innerHTML = `
+    <div class="stitle">${escHtml(p.name)}</div>
+    <div class="ssub">${escHtml(p.advertiserBrand||'')} · ${setup.dateStart||'?'} → ${setup.dateEnd||'?'} · ${escHtml(setup.loc||'—')}</div>
+    <div class="g4 mb2">
+      <div class="kpi"><div class="klbl">Total Budget</div><div class="kval">${fmt(setup.budget)}</div></div>
+      <div class="kpi"><div class="klbl">Planned (mix)</div><div class="kval">${fmt(mix.totals.planned)}</div></div>
+      <div class="kpi"><div class="klbl">Actual / Committed</div><div class="kval">${fmt(mix.totals.actual)}</div><div class="knote">${pct(mix.totals.actual, mix.totals.planned)}% of planned</div></div>
+      <div class="kpi"><div class="klbl">Channels</div><div class="kval">${S.channels.length}</div><div class="knote">${S.channels.filter(c=>c.status==='live').length} live</div></div>
+    </div>
+    <div class="g2 mb2">
+      <div class="card">
+        <div class="card-hd">Objective &amp; Audience <button class="btn btn-outline btn-sm" onclick="editOverviewBasics()">Edit</button></div>
+        <div style="font-size:11.5px;color:var(--sl);line-height:1.7"><strong>Objective:</strong> ${escHtml(setup.objective)||'<span style="color:var(--ms)">Not set</span>'}</div>
+        <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-top:8px"><strong>Audience:</strong> ${escHtml(setup.audience)||'<span style="color:var(--ms)">Not set</span>'}</div>
+      </div>
+      <div class="card">
+        <div class="card-hd">Channel Status Grid</div>
+        ${S.channels.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${S.channels.map(c=>`<span class="ch-chip" style="border:1px solid var(--bd);border-radius:20px;padding:4px 9px;font-size:11px"><span class="ch-swatch" style="background:${channelInfo(c.channel).color}"></span>${escHtml(channelInfo(c.channel).label)} ${statusPill(CHANNEL_STATUS,c.status)}</span>`).join('')}</div>` : `<div class="empty"><h4>No channels yet</h4><p>Add channels from the Media Plan page.</p></div>`}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Central Budget Mix — Planned vs Actual</div>
+      ${budgetMixRows(mix)}
+    </div>
+  `;
+}
+
+function editOverviewBasics(){
+  const setup = S.activeProject.snapshot.setup || {};
+  openModal(`
+    <div class="modal-hd"><h3>Edit Objective &amp; Audience</h3><button class="modal-x" onclick="closeModal()">&times;</button></div>
+    <div class="fld"><label>Objective</label><input id="ed-objective" value="${escHtml(setup.objective||'')}"></div>
+    <div class="fld"><label>Target audience</label><textarea id="ed-audience">${escHtml(setup.audience||'')}</textarea></div>
+    <div class="g2">
+      <div class="fld"><label>Total budget (SGD)</label><input id="ed-budget" type="number" value="${setup.budget||0}"></div>
+      <div class="fld"><label>Market / location</label><input id="ed-loc" value="${escHtml(setup.loc||'')}"></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label>Start date</label><input id="ed-start" type="date" value="${setup.dateStart||''}"></div>
+      <div class="fld"><label>End date</label><input id="ed-end" type="date" value="${setup.dateEnd||''}"></div>
+    </div>
+    <div id="ed-msg"></div>
+    <div class="mt" style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="saveOverviewBasics()">Save</button>
+    </div>
+  `);
+}
+async function saveOverviewBasics(){
+  try{
+    await patchProjectSetup({
+      objective: document.getElementById('ed-objective').value.trim(),
+      audience: document.getElementById('ed-audience').value.trim(),
+      budget: +document.getElementById('ed-budget').value || 0,
+      loc: document.getElementById('ed-loc').value.trim(),
+      dateStart: document.getElementById('ed-start').value,
+      dateEnd: document.getElementById('ed-end').value,
+    });
+    closeModal();
+    await refreshActiveProjectData();
+    await refreshProjects();
+    setPage('overview');
+  }catch(e){
+    document.getElementById('ed-msg').innerHTML = `<div class="ib ibr"><div class="ibb">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MEDIA PLAN — channel breakdown table
+// ═══════════════════════════════════════════════════════════════════════
+function renderMediaPlan(){
+  const rows = S.channels.map(c => `
+    <tr class="clickable" onclick="openChannelModal(${c.id})">
+      <td><span class="ch-chip"><span class="ch-swatch" style="background:${channelInfo(c.channel).color}"></span>${escHtml(channelInfo(c.channel).label)}</span></td>
+      <td>${statusPill(CHANNEL_STATUS, c.status)}</td>
+      <td>${c.startDate||'—'} → ${c.endDate||'—'}</td>
+      <td>${escHtml(c.objective)||'—'}</td>
+      <td>${fmt(c.budgetPlanned)}</td>
+      <td>${fmt(c.budgetActual)}</td>
+      <td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="deleteChannel(${c.id})">Remove</button></td>
+    </tr>`).join('');
+  document.getElementById('pg-mediaplan').innerHTML = `
+    <div class="stitle">Media Plan</div>
+    <div class="ssub">Channel-by-channel breakdown of objective, dates, budget and audience for ${escHtml(S.activeProject.name)}.</div>
+    <div class="card">
+      <div class="card-hd">Channels <button class="btn btn-gold btn-sm" onclick="openAddChannelsModal()">+ Add Channels</button></div>
+      ${S.channels.length ? `<table class="dt"><thead><tr><th>Channel</th><th>Status</th><th>Dates</th><th>Objective</th><th>Planned</th><th>Actual</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="empty"><h4>No channels added yet</h4><p>Click "+ Add Channels" to bring in Google, Meta, TikTok, TikTok Shop, LinkedIn, Lazada or Shopee ads for this project.</p></div>`}
+    </div>
+  `;
+}
+
+function openAddChannelsModal(){
+  const existing = new Set(S.channels.map(c => c.channel));
+  const groups = {};
+  CHANNEL_CATALOG.filter(c => !existing.has(c.id)).forEach(c => { (groups[c.group] = groups[c.group]||[]).push(c); });
+  const groupHtml = Object.entries(groups).map(([g, items]) => `
+    <div class="modal-section">${escHtml(g)}</div>
+    <div class="chk-grid">${items.map(c => `<label class="chk-line"><input type="checkbox" class="ac-chk" value="${c.id}"><span class="ch-chip"><span class="ch-swatch" style="background:${c.color}"></span>${escHtml(c.label)}</span></label>`).join('')}</div>
+  `).join('');
+  openModal(`
+    <div class="modal-hd"><h3>Add Channels</h3><button class="modal-x" onclick="closeModal()">&times;</button></div>
+    ${groupHtml || '<div class="empty"><h4>All catalog channels added</h4><p>Every channel in the catalog is already part of this project.</p></div>'}
+    <div id="ac-msg" class="mt"></div>
+    <div class="mt" style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="addSelectedChannels()">Add Selected</button>
+    </div>
+  `);
+}
+async function addSelectedChannels(){
+  const ids = [...document.querySelectorAll('.ac-chk:checked')].map(el => el.value);
+  if(!ids.length){ document.getElementById('ac-msg').innerHTML = '<div class="ib ibr"><div class="ibb">Select at least one channel.</div></div>'; return; }
+  try{
+    await Promise.all(ids.map(channel => api('/media-plan-channels', { method:'POST', body:{ campaignId:S.activeProjectId, channel, status:'planned' } })));
+    closeModal();
+    await refreshActiveProjectData();
+    setPage(S.page);
+  }catch(e){
+    document.getElementById('ac-msg').innerHTML = `<div class="ib ibr"><div class="ibb">${escHtml(e.message)}</div></div>`;
+  }
+}
+async function deleteChannel(id){
+  if(!confirm('Remove this channel from the media plan? Its budget and tracking data will be deleted.')) return;
+  await api(`/media-plan-channels/${id}`, { method:'DELETE' });
+  await refreshActiveProjectData();
+  setPage(S.page);
+}
+
+// ═══ Unified channel edit modal (used by Media Plan, Channels, Tracking) ═══
+function openChannelModal(id){
+  const c = S.channels.find(x => x.id === id);
+  if(!c) return;
+  const info = channelInfo(c.channel);
+  const utmPreview = `?utm_source=${encodeURIComponent(c.utmSource||'')}&utm_medium=${encodeURIComponent(c.utmMedium||'')}&utm_campaign=${encodeURIComponent(c.utmCampaign||'')}${c.utmContent?`&utm_content=${encodeURIComponent(c.utmContent)}`:''}${c.utmTerm?`&utm_term=${encodeURIComponent(c.utmTerm)}`:''}`;
+  openModal(`
+    <div class="modal-hd"><h3><span class="ch-chip"><span class="ch-swatch" style="background:${info.color}"></span>${escHtml(info.label)}</span></h3><button class="modal-x" onclick="closeModal()">&times;</button></div>
+
+    <div class="modal-section">Plan</div>
+    <div class="g2">
+      <div class="fld"><label>Objective</label><input id="cm-objective" value="${escHtml(c.objective)}"></div>
+      <div class="fld"><label>Status</label><select id="cm-status">${statusOptions(CHANNEL_STATUS, c.status)}</select></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label>Start date</label><input id="cm-start" type="date" value="${c.startDate||''}"></div>
+      <div class="fld"><label>End date</label><input id="cm-end" type="date" value="${c.endDate||''}"></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label>Budget planned (SGD)</label><input id="cm-budget-p" type="number" value="${c.budgetPlanned}"></div>
+      <div class="fld"><label>Budget actual (SGD)</label><input id="cm-budget-a" type="number" value="${c.budgetActual}"></div>
+    </div>
+    <div class="fld"><label>Target audience</label><textarea id="cm-audience">${escHtml(c.targetAudience)}</textarea></div>
+    <div class="fld"><label>Creative / assets (one link or note per line)</label><textarea id="cm-assets">${escHtml((c.creativeAssets||[]).join('\n'))}</textarea></div>
+
+    <div class="modal-section">KPI — Target vs Actual</div>
+    <div class="g4">
+      <div class="fld" style="margin:0"><label>Impressions (target)</label><input id="cm-kt-impr" type="number" value="${c.kpiTargets.impressions||''}"></div>
+      <div class="fld" style="margin:0"><label>Clicks (target)</label><input id="cm-kt-clicks" type="number" value="${c.kpiTargets.clicks||''}"></div>
+      <div class="fld" style="margin:0"><label>Conversions (target)</label><input id="cm-kt-conv" type="number" value="${c.kpiTargets.conversions||''}"></div>
+      <div class="fld" style="margin:0"><label>Revenue (target, SGD)</label><input id="cm-kt-rev" type="number" value="${c.kpiTargets.revenue||''}"></div>
+    </div>
+    <div class="g4 mt">
+      <div class="fld" style="margin:0"><label>Impressions (actual)</label><input id="cm-ka-impr" type="number" value="${c.kpiActuals.impressions||''}"></div>
+      <div class="fld" style="margin:0"><label>Clicks (actual)</label><input id="cm-ka-clicks" type="number" value="${c.kpiActuals.clicks||''}"></div>
+      <div class="fld" style="margin:0"><label>Conversions (actual)</label><input id="cm-ka-conv" type="number" value="${c.kpiActuals.conversions||''}"></div>
+      <div class="fld" style="margin:0"><label>Revenue (actual, SGD)</label><input id="cm-ka-rev" type="number" value="${c.kpiActuals.revenue||''}"></div>
+    </div>
+
+    <div class="modal-section">Tracking Implementation</div>
+    <div class="g3">
+      <div class="fld"><label>UTM source</label><input id="cm-utm-source" value="${escHtml(c.utmSource)}" placeholder="e.g. google"></div>
+      <div class="fld"><label>UTM medium</label><input id="cm-utm-medium" value="${escHtml(c.utmMedium)}" placeholder="e.g. cpc"></div>
+      <div class="fld"><label>UTM campaign</label><input id="cm-utm-campaign" value="${escHtml(c.utmCampaign)}" placeholder="e.g. q4-launch"></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label>UTM content</label><input id="cm-utm-content" value="${escHtml(c.utmContent)}"></div>
+      <div class="fld"><label>UTM term</label><input id="cm-utm-term" value="${escHtml(c.utmTerm)}"></div>
+    </div>
+    <div class="fld"><label>Generated UTM query string</label><input id="cm-utm-preview" readonly value="${escHtml(utmPreview)}" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;background:var(--c1)"></div>
+    <div class="g3">
+      <div class="fld"><label>Pixel status</label><select id="cm-pixel">${statusOptions(TRACK_STATUS, c.pixelStatus)}</select></div>
+      <div class="fld"><label>GA4 status</label><select id="cm-ga4">${statusOptions(TRACK_STATUS, c.ga4Status)}</select></div>
+      <div class="fld"><label>GTM status</label><select id="cm-gtm">${statusOptions(TRACK_STATUS, c.gtmStatus)}</select></div>
+    </div>
+    <div class="fld"><label>Tracking notes</label><textarea id="cm-track-notes">${escHtml(c.trackingNotes)}</textarea></div>
+    <div class="fld"><label>General notes</label><textarea id="cm-notes">${escHtml(c.notes)}</textarea></div>
+
+    <div id="cm-msg" class="mt"></div>
+    <div class="mt" style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="saveChannelModal(${c.id})">Save Channel</button>
+    </div>
+  `);
+  ['cm-utm-source','cm-utm-medium','cm-utm-campaign','cm-utm-content','cm-utm-term'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateUtmPreview);
+  });
+}
+function updateUtmPreview(){
+  const v = id => document.getElementById(id).value;
+  const preview = `?utm_source=${encodeURIComponent(v('cm-utm-source'))}&utm_medium=${encodeURIComponent(v('cm-utm-medium'))}&utm_campaign=${encodeURIComponent(v('cm-utm-campaign'))}${v('cm-utm-content')?`&utm_content=${encodeURIComponent(v('cm-utm-content'))}`:''}${v('cm-utm-term')?`&utm_term=${encodeURIComponent(v('cm-utm-term'))}`:''}`;
+  document.getElementById('cm-utm-preview').value = preview;
+}
+async function saveChannelModal(id){
+  const num = (elId) => { const v = document.getElementById(elId).value; return v===''?undefined:+v; };
+  const body = {
+    id,
+    objective: document.getElementById('cm-objective').value.trim(),
+    status: document.getElementById('cm-status').value,
+    startDate: document.getElementById('cm-start').value || null,
+    endDate: document.getElementById('cm-end').value || null,
+    budgetPlanned: +document.getElementById('cm-budget-p').value || 0,
+    budgetActual: +document.getElementById('cm-budget-a').value || 0,
+    targetAudience: document.getElementById('cm-audience').value.trim(),
+    creativeAssets: document.getElementById('cm-assets').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    kpiTargets: { impressions:num('cm-kt-impr'), clicks:num('cm-kt-clicks'), conversions:num('cm-kt-conv'), revenue:num('cm-kt-rev') },
+    kpiActuals: { impressions:num('cm-ka-impr'), clicks:num('cm-ka-clicks'), conversions:num('cm-ka-conv'), revenue:num('cm-ka-rev') },
+    utmSource: document.getElementById('cm-utm-source').value.trim(),
+    utmMedium: document.getElementById('cm-utm-medium').value.trim(),
+    utmCampaign: document.getElementById('cm-utm-campaign').value.trim(),
+    utmContent: document.getElementById('cm-utm-content').value.trim(),
+    utmTerm: document.getElementById('cm-utm-term').value.trim(),
+    pixelStatus: document.getElementById('cm-pixel').value,
+    ga4Status: document.getElementById('cm-ga4').value,
+    gtmStatus: document.getElementById('cm-gtm').value,
+    trackingNotes: document.getElementById('cm-track-notes').value.trim(),
+    notes: document.getElementById('cm-notes').value.trim(),
+  };
+  try{
+    await api('/media-plan-channels', { method:'POST', body });
+    closeModal();
+    await refreshActiveProjectData();
+    setPage(S.page);
+  }catch(e){
+    document.getElementById('cm-msg').innerHTML = `<div class="ib ibr"><div class="ibb">${escHtml(e.message)}</div></div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHANNELS — per-channel detail cards
+// ═══════════════════════════════════════════════════════════════════════
+function renderChannelsPage(){
+  const cards = S.channels.map(c => {
+    const info = channelInfo(c.channel);
+    const kt = c.kpiTargets, ka = c.kpiActuals;
+    return `<div class="card" style="cursor:pointer" onclick="openChannelModal(${c.id})">
+      <div class="card-hd"><span class="ch-chip"><span class="ch-swatch" style="background:${info.color}"></span>${escHtml(info.label)}</span>${statusPill(CHANNEL_STATUS,c.status)}</div>
+      <div style="font-size:11px;color:var(--sl);margin-bottom:8px">${c.startDate||'?'} → ${c.endDate||'?'} · ${escHtml(c.targetAudience)||'No audience note'}</div>
+      <div style="font-size:11.5px;color:var(--sl);margin-bottom:8px">${escHtml(c.objective)||'<span style="color:var(--ms)">No objective set</span>'}</div>
+      <div class="mix-track mb"><div class="mix-fill" style="width:${pct(c.budgetActual,Math.max(c.budgetPlanned,c.budgetActual,1))}%;background:${info.color}"></div></div>
+      <div style="font-size:10.5px;color:var(--sl);margin-bottom:8px">${fmt(c.budgetActual)} of ${fmt(c.budgetPlanned)} planned</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:var(--ms)">
+        <span>Impr: ${ka.impressions??'—'}/${kt.impressions??'—'}</span>
+        <span>Clicks: ${ka.clicks??'—'}/${kt.clicks??'—'}</span>
+        <span>Conv: ${ka.conversions??'—'}/${kt.conversions??'—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('pg-channels').innerHTML = `
+    <div class="stitle">Channels</div>
+    <div class="ssub">Full detail per channel — objective, budget, creative, and KPI target vs actual. Click a card to edit.</div>
+    ${S.channels.length ? `<div class="g3">${cards}</div>` : `<div class="empty"><h4>No channels yet</h4><p>Add channels from the Media Plan page first.</p><button class="btn btn-gold mt" onclick="setPage('mediaplan')">Go to Media Plan</button></div>`}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TRACKING IMPLEMENTATION
+// ═══════════════════════════════════════════════════════════════════════
+function renderTracking(){
+  const verified = S.channels.filter(c => c.pixelStatus==='verified' && c.ga4Status==='verified' && c.gtmStatus==='verified').length;
+  const rows = S.channels.map(c => `
+    <tr class="clickable" onclick="openChannelModal(${c.id})">
+      <td><span class="ch-chip"><span class="ch-swatch" style="background:${channelInfo(c.channel).color}"></span>${escHtml(channelInfo(c.channel).label)}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px">${escHtml(c.utmSource)||'—'}/${escHtml(c.utmMedium)||'—'}/${escHtml(c.utmCampaign)||'—'}</td>
+      <td>${statusPill(TRACK_STATUS,c.pixelStatus)}</td>
+      <td>${statusPill(TRACK_STATUS,c.ga4Status)}</td>
+      <td>${statusPill(TRACK_STATUS,c.gtmStatus)}</td>
+      <td>${escHtml(c.trackingNotes)||'—'}</td>
+    </tr>`).join('');
+  document.getElementById('pg-tracking').innerHTML = `
+    <div class="stitle">Tracking Implementation</div>
+    <div class="ssub">UTM structure and pixel / GA4 / GTM implementation status per channel. Click a row to edit.</div>
+    <div class="ib ${verified===S.channels.length && S.channels.length ? 'ibs' : 'ibg'} mb2"><div class="ibl" style="color:${verified===S.channels.length && S.channels.length ? 'var(--sg)':'#8A7000'}">${verified} of ${S.channels.length} channels fully verified</div><div class="ibb">Pixel, GA4 and GTM must all read "Verified" for a channel to count as tracking-ready.</div></div>
+    <div class="card">
+      ${S.channels.length ? `<table class="dt"><thead><tr><th>Channel</th><th>UTM source/medium/campaign</th><th>Pixel</th><th>GA4</th><th>GTM</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="empty"><h4>No channels yet</h4><p>Add channels from the Media Plan page first.</p></div>`}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PERFORMANCE
+// ═══════════════════════════════════════════════════════════════════════
+async function renderPerformance(){
+  document.getElementById('pg-performance').innerHTML = `<div class="stitle">Performance</div><div class="spinner"></div>`;
+  let kpi = null, activity = null;
+  try{ kpi = await api(`/campaigns/${S.activeProjectId}/kpi`); }catch(_){}
+  try{ activity = await api(`/campaigns/${S.activeProjectId}/activity-kpi`); }catch(_){}
+  const mix = S.budgetMix;
+
+  const kolCard = kpi?.latest ? `
+    <div class="kpi"><div class="klbl">KOL Spend (latest KPI entry)</div><div class="kval">${fmt(kpi.latest.spend)}</div></div>
+    <div class="kpi"><div class="klbl">KOL Revenue</div><div class="kval">${fmt(kpi.latest.revenue)}</div></div>
+    <div class="kpi"><div class="klbl">KOL ROAS</div><div class="kval">${kpi.latest.metrics.roas ?? '—'}</div></div>
+  ` : '';
+
+  document.getElementById('pg-performance').innerHTML = `
+    <div class="stitle">Performance</div>
+    <div class="ssub">Planned vs actual spend across the full budget mix, plus KPI actuals against target where set.</div>
+    <div class="card mb2">
+      <div class="card-hd">Planned vs Actual Spend</div>
+      ${budgetMixRows(mix)}
+    </div>
+    ${kolCard ? `<div class="g3 mb2">${kolCard}</div>` : ''}
+    <div class="card">
+      <div class="card-hd">Channel KPI — Target vs Actual</div>
+      ${S.channels.length ? `<table class="dt"><thead><tr><th>Channel</th><th>Impressions</th><th>Clicks</th><th>Conversions</th><th>Revenue</th></tr></thead><tbody>${
+        S.channels.map(c => `<tr>
+          <td><span class="ch-chip"><span class="ch-swatch" style="background:${channelInfo(c.channel).color}"></span>${escHtml(channelInfo(c.channel).label)}</span></td>
+          <td>${c.kpiActuals.impressions??'—'} / ${c.kpiTargets.impressions??'—'}</td>
+          <td>${c.kpiActuals.clicks??'—'} / ${c.kpiTargets.clicks??'—'}</td>
+          <td>${c.kpiActuals.conversions??'—'} / ${c.kpiTargets.conversions??'—'}</td>
+          <td>${fmt(c.kpiActuals.revenue)} / ${fmt(c.kpiTargets.revenue)}</td>
+        </tr>`).join('')
+      }</tbody></table>` : `<div class="empty"><h4>No channels yet</h4><p>Add channels and set KPI targets from the Channels page.</p></div>`}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// KOL HUB — summary + deep link into the existing KOL wizard
+// ═══════════════════════════════════════════════════════════════════════
+function renderKolHub(){
+  const mix = S.budgetMix.kol;
+  document.getElementById('pg-kolhub').innerHTML = `
+    <div class="stitle">KOL Hub</div>
+    <div class="ssub">Creator sourcing, outreach, content briefs, calendar and payments for this project live in the KOL Wizard — this is the budget summary that feeds the central mix.</div>
+    <div class="g3 mb2">
+      <div class="kpi"><div class="klbl">KOL Planned</div><div class="kval">${fmt(mix.planned)}</div><div class="knote">from the pre-campaign budget split</div></div>
+      <div class="kpi"><div class="klbl">Paid to Creators</div><div class="kval">${fmt(mix.paid)}</div></div>
+      <div class="kpi"><div class="klbl">Pending / Committed</div><div class="kval">${fmt(mix.pending)}</div><div class="knote">${fmt(mix.committed)} total committed</div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">Open the full KOL Hub</div>
+      <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:12px">Source creators, manage outreach stages, generate content briefs, build the activity calendar, and record creator payments for <strong>${escHtml(S.activeProject.name)}</strong> in the KOL Wizard.</div>
+      <a class="btn btn-gold" href="../index.html?campaignId=${S.activeProjectId}">Open KOL Hub for this project →</a>
+    </div>
+  `;
+}
+
+boot();
+</script>
+</body>
+</html>

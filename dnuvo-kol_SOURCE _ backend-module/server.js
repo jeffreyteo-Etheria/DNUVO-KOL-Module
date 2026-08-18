@@ -60,6 +60,11 @@ const {
   saveActivityKpi,
   listActivityKpi,
   summarizeActivityKpi,
+  saveMediaPlanChannel,
+  getMediaPlanChannel,
+  listMediaPlanChannels,
+  deleteMediaPlanChannel,
+  getBudgetMix,
 } = require('./src/db');
 
 const app = express();
@@ -372,7 +377,7 @@ function toCsvValue(v) {
 }
 const CREATOR_EXPORT_COLUMNS = [
   'id', 'name', 'platform', 'handle', 'profileUrl', 'followers', 'tier', 'rateNote', 'niche', 'notes',
-  'tiktokHandle', 'instagramHandle', 'metaHandle', 'lineId', 'outreachStage', 'lastContactedAt',
+  'tiktokHandle', 'instagramHandle', 'metaHandle', 'lineId', 'outreachStage', 'lastContactedAt', 'listType',
   'partnershipType', 'flatFee', 'commissionLivestreamPct', 'commissionUgcAffiliatePct', 'paymentStatus', 'paymentNotes',
 ];
 
@@ -410,6 +415,7 @@ app.get('/creator-sources/search', async (req, res) => {
       q: String(req.query.q || ''),
       partnershipType: String(req.query.partnershipType || ''),
       outreachStage: String(req.query.outreachStage || ''),
+      listType: String(req.query.listType || ''),
     });
     res.json({ items });
   } catch (e) {
@@ -636,6 +642,65 @@ app.delete('/payments/:id', async (req, res) => {
     if (!ctx) return;
     const deleted = await deletePayment(Number(req.params.id));
     res.json({ deleted });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Paid-media plan channels (media-plan dashboard: Media Plan / Channels / Tracking) ──
+app.get('/media-plan-channels', async (req, res) => {
+  try {
+    const campaignId = req.query.campaignId ? Number(req.query.campaignId) : null;
+    if (!campaignId) return res.status(400).json({ error: 'campaignId is required' });
+    const ctx = await requireCampaignAccess(req, res, campaignId);
+    if (!ctx) return;
+    res.json({ items: await listMediaPlanChannels(campaignId) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/media-plan-channels', async (req, res) => {
+  try {
+    let campaignId;
+    if (req.body.id) {
+      const existing = await getMediaPlanChannel(Number(req.body.id));
+      if (!existing) return res.status(404).json({ error: 'Media plan channel not found' });
+      campaignId = existing.campaignId;
+    } else {
+      campaignId = Number(req.body.campaignId);
+      if (!campaignId) return res.status(400).json({ error: 'campaignId is required' });
+    }
+    const ctx = await requireCampaignAccess(req, res, campaignId);
+    if (!ctx) return;
+    const id = await saveMediaPlanChannel({ ...req.body, campaignId });
+    await logCampaignAudit({ campaignId, action: 'media_plan_channel_saved', details: { id, channel: req.body.channel } });
+    res.json({ saved: true, id });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.delete('/media-plan-channels/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existing = await getMediaPlanChannel(id);
+    if (!existing) return res.status(404).json({ error: 'Media plan channel not found' });
+    const ctx = await requireCampaignAccess(req, res, existing.campaignId);
+    if (!ctx) return;
+    const deleted = await deleteMediaPlanChannel(id);
+    res.json({ deleted });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/campaigns/:id/budget-mix', async (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    const ctx = await requireCampaignAccess(req, res, campaignId);
+    if (!ctx) return;
+    res.json(await getBudgetMix(campaignId));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

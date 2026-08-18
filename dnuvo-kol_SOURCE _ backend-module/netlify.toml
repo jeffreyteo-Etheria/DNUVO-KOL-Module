@@ -121,3 +121,13 @@
   from = "/payments/*"
   to = "/.netlify/functions/api/payments/:splat"
   status = 200
+
+[[redirects]]
+  from = "/media-plan-channels"
+  to = "/.netlify/functions/api/media-plan-channels"
+  status = 200
+
+[[redirects]]
+  from = "/media-plan-channels/*"
+  to = "/.netlify/functions/api/media-plan-channels/:splat"
+  status = 200

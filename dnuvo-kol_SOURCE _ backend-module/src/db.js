@@ -191,6 +191,7 @@ async function initDb() {
       line_id TEXT,
       outreach_stage TEXT DEFAULT 'not_contacted',
       last_contacted_at TEXT,
+      list_type TEXT DEFAULT 'cold',
       partnership_type TEXT DEFAULT 'unset',
       flat_fee REAL,
       commission_livestream_pct REAL,
@@ -209,6 +210,11 @@ async function initDb() {
   try { run('ALTER TABLE creator_sources ADD COLUMN line_id TEXT'); } catch (_) {}
   try { run("ALTER TABLE creator_sources ADD COLUMN outreach_stage TEXT DEFAULT 'not_contacted'"); } catch (_) {}
   try { run('ALTER TABLE creator_sources ADD COLUMN last_contacted_at TEXT'); } catch (_) {}
+  // Roster segregation — distinct from outreach_stage (CRM contact progress):
+  // 'cold' = newly sourced, not yet engaged; 'partner' = has worked with the
+  // advertiser before (UGC or livestream); 'working' = actively planned/in a
+  // live campaign right now. Existing rows default to 'cold' on migration.
+  try { run("ALTER TABLE creator_sources ADD COLUMN list_type TEXT DEFAULT 'cold'"); } catch (_) {}
   try { run("ALTER TABLE creator_sources ADD COLUMN partnership_type TEXT DEFAULT 'unset'"); } catch (_) {}
   try { run('ALTER TABLE creator_sources ADD COLUMN flat_fee REAL'); } catch (_) {}
   try { run('ALTER TABLE creator_sources ADD COLUMN commission_livestream_pct REAL'); } catch (_) {}
@@ -304,6 +310,43 @@ async function initDb() {
     )
   `);
   run('CREATE INDEX IF NOT EXISTS idx_activity_kpi_campaign ON campaign_activity_kpi(campaign_id)');
+
+  // Paid-media plan: one row per channel per campaign (Google Search/Shopping,
+  // Meta, TikTok Ads, TikTok Shop Ads, LinkedIn, Lazada, Shopee, ...). Carries
+  // planning, budget, KPI, creative, and tracking-implementation fields
+  // together so the Media Plan, Channels, and Tracking Implementation views
+  // in the media-plan dashboard can all read the same rows.
+  run(`
+    CREATE TABLE IF NOT EXISTS media_plan_channels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL,
+      channel TEXT NOT NULL,
+      objective TEXT,
+      status TEXT DEFAULT 'planned',
+      start_date TEXT,
+      end_date TEXT,
+      target_audience TEXT,
+      budget_planned REAL DEFAULT 0,
+      budget_actual REAL DEFAULT 0,
+      kpi_targets_json TEXT,
+      kpi_actuals_json TEXT,
+      creative_assets_json TEXT,
+      utm_source TEXT,
+      utm_medium TEXT,
+      utm_campaign TEXT,
+      utm_content TEXT,
+      utm_term TEXT,
+      pixel_status TEXT DEFAULT 'not_started',
+      ga4_status TEXT DEFAULT 'not_started',
+      gtm_status TEXT DEFAULT 'not_started',
+      tracking_notes TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+    )
+  `);
+  run('CREATE INDEX IF NOT EXISTS idx_media_plan_campaign ON media_plan_channels(campaign_id)');
 
   run(`
     CREATE TABLE IF NOT EXISTS api_tokens (
@@ -648,6 +691,7 @@ function mapCreatorSource(r) {
     lineId: r.lineId || '',
     outreachStage: r.outreachStage || 'not_contacted',
     lastContactedAt: r.lastContactedAt || null,
+    listType: r.listType || 'cold',
     partnershipType: r.partnershipType || 'unset',
     flatFee: r.flatFee ?? null,
     commissionLivestreamPct: r.commissionLivestreamPct ?? null,
@@ -663,7 +707,7 @@ const CREATOR_SOURCE_COLUMNS = `id, advertiser_id AS advertiserId, name, platfor
   followers, tier, rate_note AS rateNote, niche, notes, source, verify_status AS verifyStatus,
   verify_http AS verifyHttp, verified_at AS verifiedAt, tiktok_handle AS tiktokHandle,
   instagram_handle AS instagramHandle, meta_handle AS metaHandle, line_id AS lineId,
-  outreach_stage AS outreachStage, last_contacted_at AS lastContactedAt,
+  outreach_stage AS outreachStage, last_contacted_at AS lastContactedAt, list_type AS listType,
   partnership_type AS partnershipType, flat_fee AS flatFee,
   commission_livestream_pct AS commissionLivestreamPct, commission_ugc_affiliate_pct AS commissionUgcAffiliatePct,
   payment_status AS paymentStatus, payment_notes AS paymentNotes,
@@ -684,14 +728,14 @@ async function saveCreatorSource(payload) {
       `UPDATE creator_sources
        SET name = ?, platform = ?, handle = ?, profile_url = ?, followers = ?, tier = ?,
            rate_note = ?, niche = ?, notes = ?, source = ?, tiktok_handle = ?, instagram_handle = ?,
-           meta_handle = ?, line_id = ?, outreach_stage = ?, last_contacted_at = ?,
+           meta_handle = ?, line_id = ?, outreach_stage = ?, last_contacted_at = ?, list_type = ?,
            partnership_type = ?, flat_fee = ?, commission_livestream_pct = ?, commission_ugc_affiliate_pct = ?,
            payment_status = ?, payment_notes = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [merged.name, merged.platform, merged.handle || '', merged.profileUrl, merged.followers || 0, merged.tier || '',
         merged.rateNote || '', merged.niche || '', merged.notes || '', merged.source || 'manual',
         merged.tiktokHandle || '', merged.instagramHandle || '', merged.metaHandle || '', merged.lineId || '',
-        merged.outreachStage || 'not_contacted', merged.lastContactedAt || null,
+        merged.outreachStage || 'not_contacted', merged.lastContactedAt || null, merged.listType || 'cold',
         merged.partnershipType || 'unset', merged.flatFee ?? null, merged.commissionLivestreamPct ?? null,
         merged.commissionUgcAffiliatePct ?? null, merged.paymentStatus || 'unpaid', merged.paymentNotes || '',
         payload.id]
@@ -702,7 +746,7 @@ async function saveCreatorSource(payload) {
   const {
     advertiserId, name, platform, handle, profileUrl,
     followers = 0, tier = '', rateNote = '', niche = '', notes = '', source = 'manual',
-    tiktokHandle = '', instagramHandle = '', metaHandle = '', lineId = '',
+    tiktokHandle = '', instagramHandle = '', metaHandle = '', lineId = '', listType = 'cold',
     partnershipType = 'unset', flatFee = null, commissionLivestreamPct = null, commissionUgcAffiliatePct = null,
     paymentStatus = 'unpaid', paymentNotes = '',
   } = payload;
@@ -719,22 +763,22 @@ async function saveCreatorSource(payload) {
   run(
     `INSERT INTO creator_sources
       (advertiser_id, name, platform, handle, profile_url, followers, tier, rate_note, niche, notes, source,
-       tiktok_handle, instagram_handle, meta_handle, line_id,
+       tiktok_handle, instagram_handle, meta_handle, line_id, list_type,
        partnership_type, flat_fee, commission_livestream_pct, commission_ugc_affiliate_pct, payment_status, payment_notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(advertiser_id, profile_url) DO UPDATE SET
        name = excluded.name, platform = excluded.platform, handle = excluded.handle,
        followers = excluded.followers, tier = excluded.tier, rate_note = excluded.rate_note,
        niche = excluded.niche, notes = excluded.notes, source = excluded.source,
        tiktok_handle = excluded.tiktok_handle, instagram_handle = excluded.instagram_handle,
-       meta_handle = excluded.meta_handle, line_id = excluded.line_id,
+       meta_handle = excluded.meta_handle, line_id = excluded.line_id, list_type = excluded.list_type,
        partnership_type = excluded.partnership_type, flat_fee = excluded.flat_fee,
        commission_livestream_pct = excluded.commission_livestream_pct,
        commission_ugc_affiliate_pct = excluded.commission_ugc_affiliate_pct,
        payment_status = excluded.payment_status, payment_notes = excluded.payment_notes,
        updated_at = CURRENT_TIMESTAMP`,
     [advKey, name, platform, handle || '', profileUrl, followers, tier, rateNote, niche, notes, source,
-      tiktokHandle, instagramHandle, metaHandle, lineId,
+      tiktokHandle, instagramHandle, metaHandle, lineId, listType,
       partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct, paymentStatus, paymentNotes]
   );
   await persistDb();
@@ -769,12 +813,13 @@ async function bulkImportCreatorSources(items, advertiserId) {
 // Search across the creator library. LIKE-based, case-insensitive via COLLATE
 // NOCASE on TEXT columns — fine at this table's expected scale, not meant for
 // full-text search at very large volumes.
-async function searchCreatorSources({ advertiserId = null, q = '', partnershipType = '', outreachStage = '' } = {}) {
+async function searchCreatorSources({ advertiserId = null, q = '', partnershipType = '', outreachStage = '', listType = '' } = {}) {
   const clauses = [];
   const params = [];
   if (advertiserId) { clauses.push('advertiser_id = ?'); params.push(advertiserId); }
   if (partnershipType) { clauses.push('partnership_type = ?'); params.push(partnershipType); }
   if (outreachStage) { clauses.push('outreach_stage = ?'); params.push(outreachStage); }
+  if (listType) { clauses.push('list_type = ?'); params.push(listType); }
   if (q) {
     const like = `%${q}%`;
     clauses.push(`(
@@ -1105,6 +1150,159 @@ function summarizeActivityKpi(rows) {
   }));
 }
 
+// ── Paid-media plan channels (Media Plan / Channels / Tracking Implementation) ──
+const MEDIA_PLAN_COLUMNS = `id, campaign_id AS campaignId, channel, objective, status,
+  start_date AS startDate, end_date AS endDate, target_audience AS targetAudience,
+  budget_planned AS budgetPlanned, budget_actual AS budgetActual,
+  kpi_targets_json AS kpiTargetsJson, kpi_actuals_json AS kpiActualsJson,
+  creative_assets_json AS creativeAssetsJson,
+  utm_source AS utmSource, utm_medium AS utmMedium, utm_campaign AS utmCampaign,
+  utm_content AS utmContent, utm_term AS utmTerm,
+  pixel_status AS pixelStatus, ga4_status AS ga4Status, gtm_status AS gtmStatus,
+  tracking_notes AS trackingNotes, notes,
+  created_at AS createdAt, updated_at AS updatedAt`;
+
+function mapMediaPlanChannel(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    campaignId: r.campaignId,
+    channel: r.channel,
+    objective: r.objective || '',
+    status: r.status || 'planned',
+    startDate: r.startDate || null,
+    endDate: r.endDate || null,
+    targetAudience: r.targetAudience || '',
+    budgetPlanned: Number(r.budgetPlanned || 0),
+    budgetActual: Number(r.budgetActual || 0),
+    kpiTargets: r.kpiTargetsJson ? JSON.parse(r.kpiTargetsJson) : {},
+    kpiActuals: r.kpiActualsJson ? JSON.parse(r.kpiActualsJson) : {},
+    creativeAssets: r.creativeAssetsJson ? JSON.parse(r.creativeAssetsJson) : [],
+    utmSource: r.utmSource || '',
+    utmMedium: r.utmMedium || '',
+    utmCampaign: r.utmCampaign || '',
+    utmContent: r.utmContent || '',
+    utmTerm: r.utmTerm || '',
+    pixelStatus: r.pixelStatus || 'not_started',
+    ga4Status: r.ga4Status || 'not_started',
+    gtmStatus: r.gtmStatus || 'not_started',
+    trackingNotes: r.trackingNotes || '',
+    notes: r.notes || '',
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+async function getMediaPlanChannel(id) {
+  return mapMediaPlanChannel(get(`SELECT ${MEDIA_PLAN_COLUMNS} FROM media_plan_channels WHERE id = ?`, [id]));
+}
+
+async function saveMediaPlanChannel(payload) {
+  if (payload.id) {
+    // Partial update: merge onto the existing row so e.g. a bare status-change
+    // call can't blank out budgets/tracking fields it didn't send — same
+    // pattern as saveCalendarEntry/saveCreatorSource above.
+    const existing = await getMediaPlanChannel(payload.id);
+    if (!existing) throw new Error('Media plan channel not found');
+    const merged = { ...existing, ...Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined)) };
+    if (!merged.channel) throw new Error('channel is required');
+    run(
+      `UPDATE media_plan_channels
+       SET channel = ?, objective = ?, status = ?, start_date = ?, end_date = ?, target_audience = ?,
+           budget_planned = ?, budget_actual = ?, kpi_targets_json = ?, kpi_actuals_json = ?,
+           creative_assets_json = ?, utm_source = ?, utm_medium = ?, utm_campaign = ?, utm_content = ?,
+           utm_term = ?, pixel_status = ?, ga4_status = ?, gtm_status = ?, tracking_notes = ?, notes = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [merged.channel, merged.objective, merged.status, merged.startDate, merged.endDate, merged.targetAudience,
+        merged.budgetPlanned, merged.budgetActual,
+        JSON.stringify(merged.kpiTargets || {}), JSON.stringify(merged.kpiActuals || {}),
+        JSON.stringify(merged.creativeAssets || []),
+        merged.utmSource, merged.utmMedium, merged.utmCampaign, merged.utmContent, merged.utmTerm,
+        merged.pixelStatus, merged.ga4Status, merged.gtmStatus, merged.trackingNotes, merged.notes,
+        payload.id]
+    );
+    await persistDb();
+    return Number(payload.id);
+  }
+  const {
+    campaignId, channel, objective = '', status = 'planned', startDate = null, endDate = null,
+    targetAudience = '', budgetPlanned = 0, budgetActual = 0, kpiTargets = {}, kpiActuals = {},
+    creativeAssets = [], utmSource = '', utmMedium = '', utmCampaign = '', utmContent = '', utmTerm = '',
+    pixelStatus = 'not_started', ga4Status = 'not_started', gtmStatus = 'not_started',
+    trackingNotes = '', notes = '',
+  } = payload;
+  if (!campaignId) throw new Error('campaignId is required');
+  if (!channel) throw new Error('channel is required');
+  const created = run(
+    `INSERT INTO media_plan_channels
+      (campaign_id, channel, objective, status, start_date, end_date, target_audience,
+       budget_planned, budget_actual, kpi_targets_json, kpi_actuals_json, creative_assets_json,
+       utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+       pixel_status, ga4_status, gtm_status, tracking_notes, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [campaignId, channel, objective, status, startDate, endDate, targetAudience,
+      budgetPlanned, budgetActual, JSON.stringify(kpiTargets), JSON.stringify(kpiActuals), JSON.stringify(creativeAssets),
+      utmSource, utmMedium, utmCampaign, utmContent, utmTerm,
+      pixelStatus, ga4Status, gtmStatus, trackingNotes, notes]
+  );
+  await persistDb();
+  return created.lastID;
+}
+
+async function listMediaPlanChannels(campaignId) {
+  return all(
+    `SELECT ${MEDIA_PLAN_COLUMNS} FROM media_plan_channels WHERE campaign_id = ? ORDER BY id ASC`,
+    [campaignId]
+  ).map(mapMediaPlanChannel);
+}
+
+async function deleteMediaPlanChannel(id) {
+  const res = run('DELETE FROM media_plan_channels WHERE id = ?', [id]);
+  await persistDb();
+  return res.changes > 0;
+}
+
+// Central budget mix for a project: paid-media channel plan/actuals (this
+// module) combined with the KOL plan/actuals that already live in the KOL
+// wizard's data — the pre-campaign budget split (setup.budgetPlan.kolAmount)
+// for "planned", and the creator_payments ledger for "actual" (paid vs still
+// pending). One shape feeds both the media-plan dashboard's rollup card and
+// the KOL Hub summary.
+async function getBudgetMix(campaignId) {
+  const campaign = await getCampaign(campaignId);
+  const channels = await listMediaPlanChannels(campaignId);
+  const payments = await listPayments({ campaignId });
+
+  const setup = campaign?.snapshot?.setup || {};
+  const budgetPlan = setup.budgetPlan || {};
+  const kolPlanned = Number(budgetPlan.kolAmount || 0);
+  const kolPaid = payments.filter((p) => p.status === 'paid').reduce((s, p) => s + Number(p.amount || 0), 0);
+  const kolPending = payments.filter((p) => p.status !== 'paid').reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  const channelsPlanned = channels.reduce((s, c) => s + Number(c.budgetPlanned || 0), 0);
+  const channelsActual = channels.reduce((s, c) => s + Number(c.budgetActual || 0), 0);
+  const productionPlanned = Number(budgetPlan.prodAmount || 0);
+  const contingencyPlanned = Number(budgetPlan.contAmount || 0);
+
+  return {
+    campaignId: Number(campaignId),
+    totalBudget: Number(setup.budget || 0),
+    channels: channels.map((c) => ({
+      id: c.id, channel: c.channel, status: c.status,
+      budgetPlanned: c.budgetPlanned, budgetActual: c.budgetActual,
+    })),
+    paidMedia: { planned: channelsPlanned, actual: channelsActual },
+    kol: { planned: kolPlanned, paid: kolPaid, pending: kolPending, committed: kolPaid + kolPending },
+    production: { planned: productionPlanned },
+    contingency: { planned: contingencyPlanned },
+    totals: {
+      planned: channelsPlanned + kolPlanned + productionPlanned + contingencyPlanned,
+      actual: channelsActual + kolPaid + kolPending,
+    },
+  };
+}
+
 // ── API token store (TikTok / Meta OAuth credentials) ──────────────────────
 async function saveApiToken(provider, data) {
   run(
@@ -1239,4 +1437,9 @@ module.exports = {
   saveActivityKpi,
   listActivityKpi,
   summarizeActivityKpi,
+  saveMediaPlanChannel,
+  getMediaPlanChannel,
+  listMediaPlanChannels,
+  deleteMediaPlanChannel,
+  getBudgetMix,
 };

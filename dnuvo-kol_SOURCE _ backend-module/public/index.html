@@ -140,6 +140,7 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
     </div>
   </div>
   <div class="tb-r">
+    <a class="tb-pill" href="media-plan/index.html" style="text-decoration:none;border-color:rgba(255,199,44,.6);color:#FFE8A8">← Media Planning Dashboard</a>
     <div class="adv-pill" id="adv-pill" style="display:none"><span id="adv-pill-name">Advertiser</span><img id="adv-pill-logo" src="" alt="Advertiser logo" style="display:none"></div>
     <div class="tb-pill" id="role-pill" style="display:none"></div>
     <div class="tb-pill" id="quota-pill" style="display:none" title="Your usage allowance for paid API tools (KOL sourcing, AI, link checks)"></div>
@@ -360,6 +361,13 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <div class="fld" style="margin:0"><label>Rate note</label><input id="cs-rate" placeholder="e.g. S$700-1,200, 2-3 posts"></div>
       <div class="fld" style="margin:0"><label>Niche / notes</label><input id="cs-notes" placeholder="e.g. K-beauty, 30-day skin diary format"></div>
     </div>
+    <div class="fld"><label>List <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ms)">— roster bucket, separate from the outreach stage below</span></label>
+      <select id="cs-list-type" style="max-width:460px">
+        <option value="cold">New / Cold — sourced, not yet engaged</option>
+        <option value="partner">Partner — has worked with d.nuvo before (UGC or livestream)</option>
+        <option value="working">Working — actively planned in a live campaign</option>
+      </select>
+    </div>
     <div class="card-hd" style="margin-top:4px">Partnership type & commission <span style="font-weight:400;text-transform:none;letter-spacing:0">— how this creator is paid</span></div>
     <div class="g4" style="gap:10px">
       <div class="fld" style="margin:0"><label>Partnership type</label><select id="cs-partnership" onchange="renderPartnershipFields()">
@@ -387,7 +395,7 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <button class="btn btn-outline" onclick="downloadContactReport()">⬇ Download Contact & Outreach Report</button>
     </div>
     <div class="card-hd" style="margin-top:10px">Bulk upload / download <span style="font-weight:400;text-transform:none;letter-spacing:0">— populate the whole library from a spreadsheet instead of one entry at a time</span></div>
-    <div style="font-size:11px;color:var(--sl);line-height:1.6;margin-bottom:6px">CSV columns: name, platform, handle, profileUrl, followers, tier, rateNote, niche, notes, tiktokHandle, instagramHandle, metaHandle, lineId, partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct. Only name/platform/profileUrl are required per row.</div>
+    <div style="font-size:11px;color:var(--sl);line-height:1.6;margin-bottom:6px">CSV columns: name, platform, handle, profileUrl, followers, tier, rateNote, niche, notes, tiktokHandle, instagramHandle, metaHandle, lineId, listType (cold/partner/working — defaults to cold), partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct. Only name/platform/profileUrl are required per row.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <input type="file" id="cs-csv-file" accept=".csv" style="font-size:11px">
       <button class="btn btn-outline" onclick="uploadCreatorCsv()">⬆ Upload CSV to Library</button>
@@ -395,8 +403,14 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <button class="btn btn-outline" onclick="downloadCreatorLibraryCsv()">⬇ Export library as CSV</button>
     </div>
     <div id="cs-csv-msg" class="mt"></div>
-    <div class="g3 mt" style="gap:10px">
+    <div class="g4 mt" style="gap:10px">
       <div class="fld" style="margin:0"><label>Search creator profiles</label><input id="cs-filter" placeholder="Search name, handle, platform, tier, niche..." oninput="renderCreatorLibrary()"></div>
+      <div class="fld" style="margin:0"><label>List</label><select id="cs-list-filter" onchange="renderCreatorLibrary()">
+        <option value="">All lists</option>
+        <option value="cold">New (Cold)</option>
+        <option value="partner">Partner</option>
+        <option value="working">Working</option>
+      </select></div>
       <div class="fld" style="margin:0"><label>Outreach stage</label><select id="cs-stage-filter" onchange="renderCreatorLibrary()">
         <option value="">All stages</option>
         <option value="not_contacted">Not contacted</option>
@@ -533,6 +547,34 @@ body{font-family:"Inter",sans-serif;background:var(--cr);color:var(--ink);min-he
       <div class="fld"><label>Describe available footage</label><textarea id="c-footage" placeholder="e.g. 90-min Shopee LIVE recording from 12 Jun — host demos Vit C Ampoule at 00:14, applies Calming Ampoule 00:31, Q&A on milia 00:47..." style="min-height:96px"></textarea></div>
       <div class="fld"><label>Clips wanted from this footage</label><input id="c-clips" type="number" value="4" min="1" max="12"></div>
       <button class="btn btn-gold" style="width:100%" onclick="buildEditBrief()">Generate Edit Brief →</button>
+    </div>
+  </div>
+
+  <div class="card mb2">
+    <div class="card-hd">C · Build Social Content from a URL <span style="font-weight:400;text-transform:none;letter-spacing:0">— KOL UGC content hub</span></div>
+    <div style="font-size:11.5px;color:var(--sl);line-height:1.7;margin-bottom:10px">Paste an article URL, pick a content type and aspect ratio, and this builds a copy-paste prompt for an external AI tool (Claude, ChatGPT, etc.) — same no-backend pattern as the outreach templates above. The prompt makes that tool fetch the source, hold to a strict claim ceiling (nothing beyond what the article actually says), redesign the messaging through d.nuvo's real 4-step Ceramided™ routine and claim guardrails, pause for your review, then hand back an image-generation prompt + alt text + filename — labelled <strong>PENDING REVIEW</strong>. Nothing here self-approves or publishes.</div>
+    <div class="g3" style="gap:10px">
+      <div class="fld" style="margin:0"><label class="req">Article URL</label><input id="sc-url" placeholder="https://example.com/article"></div>
+      <div class="fld" style="margin:0"><label>Content type</label>
+        <select id="sc-type">
+          <option value="educational">Educational</option>
+          <option value="promotional">Promotional</option>
+          <option value="benefits">Benefits</option>
+          <option value="science_challenge">Science-backed challenge</option>
+        </select>
+      </div>
+      <div class="fld" style="margin:0"><label>Aspect ratio</label>
+        <select id="sc-ratio">
+          <option value="16:9">16:9 — landscape</option>
+          <option value="1:1">1:1 — square</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-gold" onclick="buildSocialContentPrompt()">Build Prompt →</button>
+    <div id="sc-msg" class="mt"></div>
+    <div id="sc-output-wrap" class="mt" style="display:none">
+      <div class="fld"><label>Copy-paste prompt — paste this into Claude, ChatGPT, or any AI tool with web access</label><textarea id="sc-prompt-preview" readonly style="min-height:260px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6"></textarea></div>
+      <button class="btn btn-outline" onclick="copySocialPromptToClipboard()">⧉ Copy Prompt to Clipboard</button>
     </div>
   </div>
 
@@ -1594,6 +1636,36 @@ async function loadSelectedCampaign(){
   }
 }
 
+// Deep-link loader for ?campaignId=<id> (used by the Media Planning Dashboard's
+// "KOL Hub" link). Mirrors loadSelectedCampaign() but takes the id directly
+// instead of reading the campaign-select DOM element, since that select may
+// not have finished populating yet when this runs during boot.
+async function loadCampaignById(id){
+  const msg = document.getElementById('campaign-msg');
+  try{
+    const data = await api(`/campaigns/${id}`);
+    DEMO_MODE = false;
+    S.campaignId = data.id;
+    S.campaignName = data.name;
+    if(AUTH.role === 'superadmin' && data.advertiserId){
+      AUTH.activeAdvertiserId = data.advertiserId;
+      renderAdvertiserPanel();
+      renderAdvertiserPill();
+    }
+    document.getElementById('campaign-name').value = data.name || '';
+    hydrateFromSnapshot(data.snapshot || {});
+    await loadKpiHistory();
+    await loadCampaignAudit();
+    await loadCampaignList();
+    const sel = document.getElementById('campaign-select');
+    if(sel) sel.value = String(id);
+    msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Campaign loaded</div><div class="ibb">Loaded #${data.id} ${data.name} from the Media Planning Dashboard.</div></div>`;
+    goStep(0);
+  }catch(e){
+    msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Load failed</div><div class="ibb">${e.message}</div></div>`;
+  }
+}
+
 async function saveCampaignSnapshot(){
   const msg = document.getElementById('campaign-msg');
   if(!S.setup){
@@ -1781,13 +1853,13 @@ function loadDemoCreatorsStep(){
 
   const now=new Date().toISOString();
   CREATOR_LIBRARY=[
-    {id:1,name:'Dr Samuel GP',platform:'TikTok',handle:'drsamuelgp',followers:142000,tier:'micro',rateNote:'S$2,000-3,500 · 2 posts + endorsement + Spark rights',niche:'Clinical/GP skincare authority',tiktokHandle:'drsamuelgp',outreachStage:'confirmed',partnershipType:'paid',flatFee:2800,verifyStatus:'live',verifiedAt:now},
-    {id:2,name:'graceglazee',platform:'TikTok',handle:'graceglazee',followers:68000,tier:'micro',rateNote:'S$700-1,200 · 2-3 posts + affiliate code',niche:'K-beauty, 30-day skin diary',tiktokHandle:'graceglazee',outreachStage:'replied',partnershipType:'commission',commissionUgcAffiliatePct:10,verifyStatus:'live',verifiedAt:now},
-    {id:3,name:'lifewithmils',platform:'TikTok',handle:'lifewithmils',followers:51000,tier:'micro',rateNote:'S$600-1,000 · 2-3 posts + affiliate code',niche:'Lifestyle/wellness, routine narrative',tiktokHandle:'lifewithmils',outreachStage:'messaged',partnershipType:'unset',verifyStatus:'unverified'},
-    {id:4,name:'evelynnexie',platform:'TikTok',handle:'evelynnexie',followers:18000,tier:'nano',rateNote:'S$120-250 · 1-2 posts',niche:'Beauty/food/lifestyle micro',tiktokHandle:'evelynnexie',outreachStage:'not_contacted',partnershipType:'gifting',verifyStatus:'unverified'},
-    {id:5,name:'gaga_beauty',platform:'TikTok',handle:'gaga_beauty',followers:73000,tier:'micro',rateNote:'S$600-900 · 2 posts + 1 co-hosted LIVE',niche:'Beauty reviews/tutorials, LIVE co-host',tiktokHandle:'gaga_beauty',outreachStage:'replied',partnershipType:'commission',commissionLivestreamPct:15,verifyStatus:'live',verifiedAt:now},
-    {id:6,name:'vedawinfam',platform:'TikTok',handle:'vedawinfam',followers:210000,tier:'mid',rateNote:'S$2,000 · 3-part series incl. 1 co-hosted LIVE',niche:'Thai/SG lifestyle+family, LIVE commerce history',tiktokHandle:'vedawinfam',outreachStage:'confirmed',partnershipType:'commission',commissionLivestreamPct:15,commissionUgcAffiliatePct:10,verifyStatus:'live',verifiedAt:now},
-    {id:7,name:'jannatul_mitsuisen',platform:'TikTok',handle:'jannatul_mitsuisen',followers:640000,tier:'macro',rateNote:'Max S$2,500 · verify rate first',niche:'Large SG skincare reach',tiktokHandle:'jannatul_mitsuisen',outreachStage:'not_contacted',partnershipType:'unset',verifyStatus:'unverified'},
+    {id:1,name:'Dr Samuel GP',platform:'TikTok',handle:'drsamuelgp',followers:142000,tier:'micro',rateNote:'S$2,000-3,500 · 2 posts + endorsement + Spark rights',niche:'Clinical/GP skincare authority',tiktokHandle:'drsamuelgp',outreachStage:'confirmed',listType:'working',partnershipType:'paid',flatFee:2800,verifyStatus:'live',verifiedAt:now},
+    {id:2,name:'graceglazee',platform:'TikTok',handle:'graceglazee',followers:68000,tier:'micro',rateNote:'S$700-1,200 · 2-3 posts + affiliate code',niche:'K-beauty, 30-day skin diary',tiktokHandle:'graceglazee',outreachStage:'replied',listType:'working',partnershipType:'commission',commissionUgcAffiliatePct:10,verifyStatus:'live',verifiedAt:now},
+    {id:3,name:'lifewithmils',platform:'TikTok',handle:'lifewithmils',followers:51000,tier:'micro',rateNote:'S$600-1,000 · 2-3 posts + affiliate code',niche:'Lifestyle/wellness, routine narrative',tiktokHandle:'lifewithmils',outreachStage:'messaged',listType:'cold',partnershipType:'unset',verifyStatus:'unverified'},
+    {id:4,name:'evelynnexie',platform:'TikTok',handle:'evelynnexie',followers:18000,tier:'nano',rateNote:'S$120-250 · 1-2 posts',niche:'Beauty/food/lifestyle micro',tiktokHandle:'evelynnexie',outreachStage:'not_contacted',listType:'cold',partnershipType:'gifting',verifyStatus:'unverified'},
+    {id:5,name:'gaga_beauty',platform:'TikTok',handle:'gaga_beauty',followers:73000,tier:'micro',rateNote:'S$600-900 · 2 posts + 1 co-hosted LIVE',niche:'Beauty reviews/tutorials, LIVE co-host',tiktokHandle:'gaga_beauty',outreachStage:'replied',listType:'partner',partnershipType:'commission',commissionLivestreamPct:15,verifyStatus:'live',verifiedAt:now},
+    {id:6,name:'vedawinfam',platform:'TikTok',handle:'vedawinfam',followers:210000,tier:'mid',rateNote:'S$2,000 · 3-part series incl. 1 co-hosted LIVE',niche:'Thai/SG lifestyle+family, LIVE commerce history',tiktokHandle:'vedawinfam',outreachStage:'confirmed',listType:'partner',partnershipType:'commission',commissionLivestreamPct:15,commissionUgcAffiliatePct:10,verifyStatus:'live',verifiedAt:now},
+    {id:7,name:'jannatul_mitsuisen',platform:'TikTok',handle:'jannatul_mitsuisen',followers:640000,tier:'macro',rateNote:'Max S$2,500 · verify rate first',niche:'Large SG skincare reach',tiktokHandle:'jannatul_mitsuisen',outreachStage:'not_contacted',listType:'cold',partnershipType:'unset',verifyStatus:'unverified'},
   ];
   renderCreatorLibrary();
 
@@ -2211,6 +2283,14 @@ function stageSelectHtml(c){
   const opts = Object.entries(STAGE_LABELS).map(([v,l])=>`<option value="${v}" ${c.outreachStage===v?'selected':''}>${l}</option>`).join('');
   return `<select onchange="updateCreatorStage(${c.id}, this.value)" style="font-size:10.5px;padding:4px 6px;border:1px solid var(--bd2);border-radius:6px;width:100%">${opts}</select>`;
 }
+// Roster bucket — separate axis from outreach stage. NEW/cold = sourced but
+// not yet engaged; PARTNER = has worked with d.nuvo before (UGC/livestream);
+// WORKING = actively planned in a live campaign right now.
+const LIST_TYPE_LABELS = {cold:'New (Cold)', partner:'Partner', working:'Working'};
+function listTypeSelectHtml(c){
+  const opts = Object.entries(LIST_TYPE_LABELS).map(([v,l])=>`<option value="${v}" ${(c.listType||'cold')===v?'selected':''}>${l}</option>`).join('');
+  return `<select onchange="updateCreatorListType(${c.id}, this.value)" style="font-size:10.5px;padding:4px 6px;border:1px solid var(--bd2);border-radius:6px;width:100%">${opts}</select>`;
+}
 const PARTNERSHIP_LABELS = {unset:'Not set', gifting:'Gifting only', paid:'Paid', commission:'Commission'};
 function partnershipTag(c){
   const t = c.partnershipType || 'unset';
@@ -2231,16 +2311,18 @@ function renderCreatorLibrary(){
   const filter = (document.getElementById('cs-filter')?.value || '').toLowerCase();
   const stageFilter = document.getElementById('cs-stage-filter')?.value || '';
   const partnershipFilter = document.getElementById('cs-partnership-filter')?.value || '';
+  const listFilter = document.getElementById('cs-list-filter')?.value || '';
   const items = CREATOR_LIBRARY.filter(c => {
     if(stageFilter && (c.outreachStage||'not_contacted') !== stageFilter) return false;
     if(partnershipFilter && (c.partnershipType||'unset') !== partnershipFilter) return false;
+    if(listFilter && (c.listType||'cold') !== listFilter) return false;
     return !filter || [c.name,c.handle,c.platform,c.tier,c.niche,c.rateNote,c.tiktokHandle,c.instagramHandle].join(' ').toLowerCase().includes(filter);
   });
   populateMessageCreatorSelect();
   renderMessageTemplate();
   populateCalendarCreatorSelects();
   if(!items.length){
-    host.innerHTML = `<div class="empty"><h4>Library empty${filter||stageFilter||partnershipFilter?' for this filter':''}</h4><p>Save a creator above, upload a CSV, or click "Load Starter List" to seed creators referenced in prior d.nuvo planning docs (flagged unverified until you re-check them).</p></div>`;
+    host.innerHTML = `<div class="empty"><h4>Library empty${filter||stageFilter||partnershipFilter||listFilter?' for this filter':''}</h4><p>Save a creator above, upload a CSV, or click "Load Starter List" to seed creators referenced in prior d.nuvo planning docs (flagged unverified until you re-check them).</p></div>`;
     return;
   }
   const rows = items.map(c => `
@@ -2250,6 +2332,7 @@ function renderCreatorLibrary(){
       <td>${c.followers ? Number(c.followers).toLocaleString() : 'n/a'}</td>
       <td>${c.tier || '—'}</td>
       <td>${c.rateNote || '—'}</td>
+      <td>${listTypeSelectHtml(c)}</td>
       <td>${partnershipTag(c)}</td>
       <td>${contactLinksHtml(c)}</td>
       <td>${stageSelectHtml(c)}</td>
@@ -2260,7 +2343,7 @@ function renderCreatorLibrary(){
         <button class="btn btn-outline btn-sm" onclick="deleteLibraryCreator(${c.id})">Remove</button>
       </td>
     </tr>`).join('');
-  host.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>Rate</th><th>Partnership</th><th>Contact</th><th>Stage</th><th>Verify</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+  host.innerHTML = `<table class="dt"><thead><tr><th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>Rate</th><th>List</th><th>Partnership</th><th>Contact</th><th>Stage</th><th>Verify</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 async function saveCreatorToLibrary(payload){
@@ -2291,6 +2374,15 @@ async function updateCreatorStage(id, stage){
   }
 }
 
+async function updateCreatorListType(id, listType){
+  try{
+    await saveCreatorToLibrary({ id, listType });
+    await loadCreatorLibrary();
+  }catch(e){
+    alert('List update failed: '+e.message);
+  }
+}
+
 async function addCreatorToLibrary(){
   const msg = document.getElementById('cs-msg');
   const name = document.getElementById('cs-name').value.trim();
@@ -2305,6 +2397,7 @@ async function addCreatorToLibrary(){
   const instagramHandle = document.getElementById('cs-ct-ig').value.trim().replace(/^@/,'');
   const metaHandle = document.getElementById('cs-ct-meta').value.trim().replace(/^@/,'');
   const lineId = document.getElementById('cs-ct-line').value.trim().replace(/^@/,'');
+  const listType = document.getElementById('cs-list-type').value;
   const partnershipType = document.getElementById('cs-partnership').value;
   const flatFee = document.getElementById('cs-flat-fee').value ? +document.getElementById('cs-flat-fee').value : null;
   const commissionLivestreamPct = document.getElementById('cs-comm-live').value ? +document.getElementById('cs-comm-live').value : null;
@@ -2314,8 +2407,9 @@ async function addCreatorToLibrary(){
     return;
   }
   try{
-    await saveCreatorToLibrary({ name, platform, handle, profileUrl, followers, tier, rateNote, niche:notes, notes, source:'manual', tiktokHandle, instagramHandle, metaHandle, lineId, partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct });
+    await saveCreatorToLibrary({ name, platform, handle, profileUrl, followers, tier, rateNote, niche:notes, notes, source:'manual', tiktokHandle, instagramHandle, metaHandle, lineId, listType, partnershipType, flatFee, commissionLivestreamPct, commissionUgcAffiliatePct });
     ['cs-name','cs-handle','cs-url','cs-followers','cs-rate','cs-notes','cs-ct-tiktok','cs-ct-ig','cs-ct-meta','cs-ct-line','cs-flat-fee','cs-comm-live','cs-comm-ugc'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('cs-list-type').value = 'cold';
     document.getElementById('cs-partnership').value = 'unset';
     renderPartnershipFields();
     msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Saved to library</div><div class="ibb">Now available for every future campaign under this advertiser.</div></div>`;
@@ -2361,7 +2455,7 @@ async function deleteLibraryCreator(id){
 
 // ═══ BULK UPLOAD / DOWNLOAD — populate the library from a spreadsheet ═══
 const CREATOR_CSV_FIELDS = ['name','platform','handle','profileUrl','followers','tier','rateNote','niche','notes',
-  'tiktokHandle','instagramHandle','metaHandle','lineId','partnershipType','flatFee','commissionLivestreamPct','commissionUgcAffiliatePct'];
+  'tiktokHandle','instagramHandle','metaHandle','lineId','listType','partnershipType','flatFee','commissionLivestreamPct','commissionUgcAffiliatePct'];
 
 // Minimal RFC4180-ish CSV parser: handles quoted fields with embedded commas/newlines/escaped quotes.
 function parseCsv(text){
@@ -2403,7 +2497,7 @@ function downloadBlob(content, filename, mime){
 
 function downloadCreatorCsvTemplate(){
   const header = CREATOR_CSV_FIELDS.join(',');
-  const example = 'Dr Samuel GP,Instagram,drsamuelgp,https://www.instagram.com/drsamuelgp,50000,mid,"S$2,000-3,500",Clinical authority,2 posts + endorsement,drsamuelgp,drsamuelgp,,,commission,,15,10';
+  const example = 'Dr Samuel GP,Instagram,drsamuelgp,https://www.instagram.com/drsamuelgp,50000,mid,"S$2,000-3,500",Clinical authority,2 posts + endorsement,drsamuelgp,drsamuelgp,,,working,commission,,15,10';
   downloadBlob(header+'\n'+example+'\n', 'creator_sources_template.csv', 'text/csv');
 }
 
@@ -2632,7 +2726,7 @@ function downloadContactReport(){
   const esc = (s) => String(s||'').replace(/</g,'&lt;');
   const rows = CREATOR_LIBRARY.map(c=>{
     const links = contactLinks(c).map(l=>`<a href="${l.url}">${l.label}</a>`).join(' · ') || '—';
-    return `<tr><td>${esc(c.name)}</td><td>${esc(c.platform)}${c.handle?' @'+esc(c.handle):''}</td><td>${links}</td><td>${esc(c.followers ? Number(c.followers).toLocaleString() : '—')}</td><td>${esc(c.tier||'—')}</td><td>${esc(c.rateNote||'—')}</td><td>${esc((STAGE_LABELS[c.outreachStage]||'Not contacted'))}</td></tr>`;
+    return `<tr><td>${esc(c.name)}</td><td>${esc(c.platform)}${c.handle?' @'+esc(c.handle):''}</td><td>${links}</td><td>${esc(c.followers ? Number(c.followers).toLocaleString() : '—')}</td><td>${esc(c.tier||'—')}</td><td>${esc(c.rateNote||'—')}</td><td>${esc(LIST_TYPE_LABELS[c.listType]||'New (Cold)')}</td><td>${esc((STAGE_LABELS[c.outreachStage]||'Not contacted'))}</td></tr>`;
   }).join('');
   const f = buildMergeFields();
   const templatesHtml = Object.values(MESSAGE_TEMPLATES).map(t=>
@@ -2655,7 +2749,7 @@ a{color:#0055BB}
 <h1>${esc(brand)} — Contact Directory &amp; Outreach Templates</h1>
 <div class="meta">Generated ${new Date().toLocaleString()} from the DNUVO KOL Module creator sources library. Follower counts and links go stale — re-verify before outreach. Use your browser's Print → Save as PDF to export this page.</div>
 <h2>Contact Directory (${CREATOR_LIBRARY.length} creator${CREATOR_LIBRARY.length===1?'':'s'})</h2>
-<table><thead><tr><th>Creator</th><th>Platform</th><th>Contact links</th><th>Followers</th><th>Tier</th><th>Rate</th><th>Stage</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>Creator</th><th>Platform</th><th>Contact links</th><th>Followers</th><th>Tier</th><th>Rate</th><th>List</th><th>Stage</th></tr></thead><tbody>${rows}</tbody></table>
 <h2>Outreach Message Templates — 4 Types + Follow-up</h2>
 <div class="meta">Placeholders show as [Creator Name] / [Your Name] when no creator is selected in the dashboard. No fee is mentioned on first contact — rate discussion happens once a creator shows interest.</div>
 ${templatesHtml}
@@ -2765,6 +2859,102 @@ async function buildEditBrief(){
     S.content.push({type:'edit',text});
     out.innerHTML=`<div class="card"><div class="card-hd">Edit Brief — from your footage</div>${md(text)}</div>`;
   }catch(e){out.innerHTML=`<div class="card"><div class="ib ibr"><div class="ibl" style="color:var(--rs)">Error</div><div class="ibb">${e.message}</div></div></div>`;}
+}
+
+// ═══ C · BUILD SOCIAL CONTENT FROM A URL ═══
+// Client-side prompt builder only — no /ai/generate call, no API key. Modelled
+// on the url-to-social-content skill: claim ceiling, human review gate, and a
+// package (image prompt + alt text + filename) labelled PENDING REVIEW. Since
+// there's no server round-trip to enforce the review gate in code, the gate is
+// written INTO the prompt itself as an explicit "stop and ask before Step 2"
+// instruction to whatever AI tool the user pastes this into.
+const SOCIAL_CONTENT_TYPES = {
+  educational: {
+    label: 'Educational',
+    angle: `Explain the mechanism or finding the article actually describes, in plain language. Only connect it to d.nuvo if the article's subject matter genuinely relates to skin barrier science, ceramides, vitamin C stability/absorption, or similar — if it doesn't fit naturally, keep the concept purely educational and general-skincare, and say so in "warnings" rather than forcing a tie-in.`,
+  },
+  promotional: {
+    label: 'Promotional',
+    angle: `Use the article as a credible, real-world hook, then position ONE specific step of d.nuvo's 4-step Ceramided™ routine (Essential Toner → Vitamin C Ampoule 15.5% or Calming Ampoule → Water Cream → Eye Cream) as the natural next step a reader would take. State plainly in the concept that this is promotional content, not a report on the article's subject.`,
+  },
+  benefits: {
+    label: 'Benefits',
+    angle: `Center the concept on ONE skin-benefit outcome the article itself supports (e.g. barrier repair, brightening, hydration, calming/redness) and map it to whichever step of d.nuvo's 4-step routine addresses that benefit. Do not claim a benefit beyond what the article substantiates, even if d.nuvo's own product claims that benefit elsewhere.`,
+  },
+  science_challenge: {
+    label: 'Science-Backed Challenge',
+    angle: `Frame the concept as a short, provable challenge or demonstration format (in the spirit of d.nuvo's own "7-second herb ampoule" framing) that a reader or creator could film — grounded strictly in a mechanism or timeframe the article actually describes, never an invented one.`,
+  },
+};
+const SOCIAL_ASPECT_RATIOS = {
+  '16:9': { label: '16:9 (landscape)', placement: 'a landscape banner — blog/website header or YouTube thumbnail placement' },
+  '1:1': { label: '1:1 (square)', placement: 'a square social feed post — Instagram/Facebook/TikTok placement' },
+};
+
+function buildSocialContentPrompt(){
+  const url = t('sc-url').trim();
+  const msg = document.getElementById('sc-msg');
+  const wrap = document.getElementById('sc-output-wrap');
+  if(!url){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">URL required</div><div class="ibb">Paste the article URL first.</div></div>`; wrap.style.display='none'; return; }
+  const typeKey = document.getElementById('sc-type').value;
+  const ratioKey = document.getElementById('sc-ratio').value;
+  const type = SOCIAL_CONTENT_TYPES[typeKey];
+  const ratio = SOCIAL_ASPECT_RATIOS[ratioKey];
+
+  const prompt = `You are proposing ONE grounded social/infographic content concept based on the article at this URL, for d.nuvo (Korean ceramide derma-cosmetic skincare). This is a suggestion for a human to review and edit — not final copy, and nothing you produce here should be treated as approved or published.
+
+ARTICLE URL: ${url}
+
+STEP 1 — Get the article
+Fetch the URL above and extract the clean article text and title. If you cannot fetch it (paywalled, blocked, or you have no browsing capability), say so plainly and ask the user to paste the article text instead — do not guess the content from the URL or title alone.
+
+STEP 2 — Propose ONE concept (content type: ${type.label})
+Content type angle: ${type.angle}
+
+d.nuvo brand context (use only for framing/positioning, never as a source of facts about the article's subject):
+- d.nuvo is a derma-cosmetic brand ("the new dermatology") built around the Ceramided™ Capsule Method, which is designed to carry active ingredients past the stratum corneum toward the dermis rather than stopping at the skin's surface layer.
+- The brand's actual 4-step routine — treat this as the "4-layer stack" when the concept calls for a routine/product tie-in: (1) Essential Toner — preps and balances, (2) Vitamin C Ampoule 15.5% or Calming Ampoule — the active treatment layer, (3) Water Cream — locks in a moisture barrier, (4) Eye Cream — targeted finishing layer.
+- Visual identity: deep olive/moss green and warm cream/stone neutrals, with a terracotta-orange accent used sparingly for emphasis — minimal, editorial, dermatology-clinical-meets-natural. No bright saturated colours.
+
+CLAIM CEILING — hard rule:
+- Every supporting point, and the optional data highlight, must be directly traceable to the article text you fetched. Do not invent facts, statistics, or claims not in the article. If the article has no clear standout statistic, set "stat" and "statSource" to null rather than fabricating one.
+- Do NOT pull in d.nuvo's own clinical statistics (e.g. absorption depth, hydration %, comedone reduction) as if they came from the article — those only belong in the concept if the article itself is about d.nuvo. The brand context above is for positioning language only, never for facts.
+- Never make a medical or drug claim (no "treats," "cures," "prevents disease," no unrealistic overnight outcomes) — d.nuvo is a cosmetic product; stay in "supports," "helps," "is designed to," "clinically shown to" territory, and only where the article or established d.nuvo claims actually support it.
+- Never disparage a named competitor brand or product.
+- "points" must contain exactly 3-4 short items (under ~12 words each), each grounded in something the article actually says.
+- If anything about the article is ambiguous, add a short note to "warnings" rather than guessing silently.
+
+Present the concept clearly with these fields: headline, angle, theme (one central visual icon/illustration idea), points (3-4 items), stat (or null), statSource (or null), warnings (list, may be empty).
+
+STEP 3 — STOP AND ASK
+After presenting the concept, stop and ask me to confirm it or tell you what to change. Do not continue to Step 4 until I respond. This review gate is mandatory — it's what makes the final package trustworthy enough to hand to a human for compliance review.
+
+STEP 4 — Once I confirm (or edit) the concept, generate the package
+- An image-generation prompt: a bold, modern infographic for the confirmed headline, laying out the theme's visual icon and the supporting points, in d.nuvo's visual identity above, sized for ${ratio.label} (${ratio.placement}).
+  - Brand safety: no logos, brand marks, or watermarks in the image — add those separately during a design/compliance pass.
+  - No readable text or lettering baked into the image — headline/CTA get overlaid natively wherever this gets published, not rendered into the artwork.
+  - No "Made with AI" caption or AI-disclaimer text baked in — several image models add this automatically unless the prompt explicitly excludes it, so say so explicitly.
+  - If a sourced stat survived the review, include a simple data visual (icon, arrow, or single chart) calling it out, with its source noted.
+- Alt text: "Infographic: {headline} — {angle}", trimmed to ~160 characters; flag it if you had to trim it.
+- Suggested filename: DNUVO_Infographic_{slugified-headline}_{YYYYMMDD}.png
+- An "open items flagged" list: any colour/tone default not explicitly confirmed, the aspect ratio if it's a working default, an unsourced stat (prefix UNSUBSTANTIATED_CLAIM: if one slipped through), alt text truncation, and every warning carried over from Step 2.
+
+Label the whole output clearly as PENDING REVIEW. You never publish, schedule, or self-approve anything here — a human clears it downstream.`;
+
+  document.getElementById('sc-prompt-preview').value = prompt;
+  wrap.style.display = '';
+  msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Prompt built</div><div class="ibb">Copy it into Claude, ChatGPT, or any AI tool with web-fetch access. Nothing was sent anywhere — this ran entirely in your browser.</div></div>`;
+}
+
+function copySocialPromptToClipboard(){
+  const ta = document.getElementById('sc-prompt-preview');
+  const msg = document.getElementById('sc-msg');
+  const done = () => { msg.innerHTML = `<div class="ib ibs"><div class="ibl" style="color:var(--sg)">Copied</div><div class="ibb">Prompt copied to clipboard — paste it into your AI tool of choice.</div></div>`; };
+  if(navigator.clipboard?.writeText){
+    navigator.clipboard.writeText(ta.value).then(done).catch(()=>{ ta.select(); document.execCommand('copy'); done(); });
+  } else {
+    ta.select(); document.execCommand('copy'); done();
+  }
 }
 
 // ═══ SCHEDULE ═══
@@ -3494,6 +3684,11 @@ checkBackend();
     AUTH.role = data.role;
     AUTH.advertiser = data.advertiser || null;
     await bootDashboard();
+    const deepLinkId = new URLSearchParams(location.search).get('campaignId');
+    if(deepLinkId){
+      history.replaceState(null, '', location.pathname); // clean the URL, same as showConnectResult()
+      await loadCampaignById(Number(deepLinkId));
+    }
   } catch(e) {
     document.getElementById('api-pill').textContent = `Backend: ${e.message}`;
   }
