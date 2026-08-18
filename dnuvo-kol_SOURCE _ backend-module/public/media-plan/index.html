@@ -512,20 +512,36 @@ async function renderDashboard(){
   projEl.innerHTML = renderProjectsTable(projects, mixes);
 }
 
+// Grouped by advertiser — each advertiser can hold many campaigns/projects,
+// so the list reads as "advertiser → its campaigns" rather than one flat
+// table. Clicking any campaign row still opens its full setup on Overview.
 function renderProjectsTable(projects, mixesMaybe){
   if(!projects.length) return '<div class="empty"><h4>No projects yet</h4><p>Click "+ New Project" to get started.</p></div>';
-  const rows = projects.map((p, i) => {
-    const mix = mixesMaybe ? mixesMaybe[i] : null;
-    return `<tr class="clickable" onclick="selectProject(${p.id}).then(()=>setPage('overview'))">
-      <td><strong>${escHtml(p.name)}</strong></td>
-      <td>${escHtml(p.advertiserBrand||'—')}</td>
-      <td><span class="status-pill"><span class="status-dot" style="background:${p.status==='active'?TONE_HEX.good:TONE_HEX.muted}"></span>${escHtml(p.status||'draft')}</span></td>
-      <td>${mix ? fmt(mix.totals.planned) : '—'}</td>
-      <td>${mix ? fmt(mix.totals.actual) : '—'}</td>
-      <td>${new Date(p.updatedAt).toLocaleDateString()}</td>
-    </tr>`;
-  }).join('');
-  return `<table class="dt"><thead><tr><th>Project</th><th>Advertiser</th><th>Status</th><th>Planned</th><th>Actual</th><th>Updated</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const withMix = projects.map((p, i) => ({ p, mix: mixesMaybe ? mixesMaybe[i] : null }));
+  const groups = new Map();
+  withMix.forEach(({p, mix}) => {
+    const key = p.advertiserId || 0;
+    if(!groups.has(key)) groups.set(key, { brand: p.advertiserBrand || 'Unassigned advertiser', company: p.advertiserCompany || '', items: [] });
+    groups.get(key).items.push({p, mix});
+  });
+  return [...groups.values()]
+    .sort((a,b)=>a.brand.localeCompare(b.brand))
+    .map(g => {
+      const rows = g.items.map(({p, mix}) => `<tr class="clickable" onclick="selectProject(${p.id}).then(()=>setPage('overview'))">
+        <td><strong>${escHtml(p.name)}</strong></td>
+        <td><span class="status-pill"><span class="status-dot" style="background:${p.status==='active'?TONE_HEX.good:TONE_HEX.muted}"></span>${escHtml(p.status||'draft')}</span></td>
+        <td>${mix ? fmt(mix.totals.planned) : '—'}</td>
+        <td>${mix ? fmt(mix.totals.actual) : '—'}</td>
+        <td>${new Date(p.updatedAt).toLocaleDateString()}</td>
+      </tr>`).join('');
+      return `<div class="mb2">
+        <div style="display:flex;align-items:baseline;gap:8px;padding:4px 2px 8px;border-bottom:2px solid var(--bd2);margin-bottom:6px">
+          <strong style="font-family:'Playfair Display',serif;font-size:15px">${escHtml(g.brand)}</strong>
+          <span style="font-size:10.5px;color:var(--ms)">${g.company ? escHtml(g.company)+' · ' : ''}${g.items.length} project${g.items.length===1?'':'s'}</span>
+        </div>
+        <table class="dt"><thead><tr><th>Project</th><th>Status</th><th>Planned</th><th>Actual</th><th>Updated</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
+    }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -552,23 +568,32 @@ function renderProjectsPage(){
 
 function openNewProjectModal(){
   const advOptions = AUTH.role === 'superadmin'
-    ? `<div class="fld"><label class="req">Advertiser</label><select id="np-adv">${AUTH.advertisers.map(a=>`<option value="${a.id}" ${a.id===AUTH.activeAdvertiserId?'selected':''}>${escHtml(a.brand)}</option>`).join('')}</select></div>`
+    ? `<div class="fld"><label>Advertiser</label><select id="np-adv" onchange="toggleNewAdvertiserFields()">
+        ${AUTH.advertisers.map(a=>`<option value="${a.id}" ${a.id===AUTH.activeAdvertiserId?'selected':''}>${escHtml(a.brand)}</option>`).join('')}
+        <option value="__new__">+ Create new advertiser…</option>
+      </select></div>
+      <div id="np-new-adv-flds" style="display:none">
+        <div class="g2">
+          <div class="fld" style="margin:0"><label>New advertiser — company</label><input id="np-new-adv-company" placeholder="e.g. Etheria Group"></div>
+          <div class="fld" style="margin:0"><label>New advertiser — brand</label><input id="np-new-adv-brand" placeholder="e.g. Dr Deep"></div>
+        </div>
+      </div>`
     : '';
   openModal(`
     <div class="modal-hd"><h3>New Project</h3><button class="modal-x" onclick="closeModal()">&times;</button></div>
     ${advOptions}
-    <div class="fld"><label class="req">Project name</label><input id="np-name" placeholder="e.g. DNUVO SG Q4 Always-On"></div>
+    <div class="fld"><label>Project name</label><input id="np-name" placeholder="e.g. DNUVO SG Q4 Always-On — leave blank to name it later"></div>
     <div class="g2">
-      <div class="fld"><label class="req">Total budget (SGD)</label><input id="np-budget" type="number" placeholder="e.g. 30000"></div>
+      <div class="fld"><label>Total budget (SGD)</label><input id="np-budget" type="number" placeholder="e.g. 30000"></div>
       <div class="fld"><label>Market / location</label><input id="np-loc" placeholder="Singapore" value="Singapore"></div>
     </div>
     <div class="g2">
-      <div class="fld"><label class="req">Start date</label><input id="np-start" type="date"></div>
-      <div class="fld"><label class="req">End date</label><input id="np-end" type="date"></div>
+      <div class="fld"><label>Start date</label><input id="np-start" type="date"></div>
+      <div class="fld"><label>End date</label><input id="np-end" type="date"></div>
     </div>
     <div class="fld"><label>Objective</label><input id="np-objective" placeholder="e.g. Drive 11.11 Vitamin C Ampoule sales across paid + KOL"></div>
     <div class="fld"><label>Target audience</label><textarea id="np-audience" placeholder="e.g. Women 22-35 in Singapore, acne-prone/sensitive skin, compares K-beauty efficacy and value."></textarea></div>
-    <div class="modal-section">Budget split intent (optional — feeds the central budget mix; must total 100%)</div>
+    <div class="modal-section">Budget split intent (optional — feeds the central budget mix; flagged later if it doesn't total 100%, but nothing here blocks creating the project)</div>
     <div class="g4">
       <div class="fld" style="margin:0"><label>KOL %</label><input id="np-pct-kol" type="number" value="45"></div>
       <div class="fld" style="margin:0"><label>Paid media %</label><input id="np-pct-paid" type="number" value="30"></div>
@@ -582,10 +607,19 @@ function openNewProjectModal(){
     </div>
   `);
 }
+function toggleNewAdvertiserFields(){
+  const sel = document.getElementById('np-adv');
+  const flds = document.getElementById('np-new-adv-flds');
+  if(flds) flds.style.display = sel.value === '__new__' ? '' : 'none';
+}
 
+// Nothing here blocks creation — a project can be saved with just a name (or
+// no name at all, in which case one is generated) and filled in later. Every
+// gap is surfaced as a highlighted, non-blocking notice on the project's
+// Overview page instead, via computeProjectGaps().
 async function createProject(){
   const msg = document.getElementById('np-msg');
-  const name = document.getElementById('np-name').value.trim();
+  const name = document.getElementById('np-name').value.trim() || `Untitled Project — ${new Date().toISOString().slice(0,10)}`;
   const budget = +document.getElementById('np-budget').value || 0;
   const loc = document.getElementById('np-loc').value.trim();
   const dateStart = document.getElementById('np-start').value;
@@ -597,21 +631,25 @@ async function createProject(){
   const prodPct = +document.getElementById('np-pct-prod').value || 0;
   const contPct = +document.getElementById('np-pct-cont').value || 0;
   const advSel = document.getElementById('np-adv');
-  const advertiserId = advSel ? Number(advSel.value) : AUTH.advertiser?.id;
 
-  const missing = [];
-  if(!name) missing.push('project name'); if(!budget) missing.push('budget'); if(!dateStart||!dateEnd) missing.push('dates');
-  if(missing.length){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Missing required fields</div><div class="ibb">${missing.join(' · ')}</div></div>`; return; }
-  const totalPct = kolPct+paidPct+prodPct+contPct;
-  if(totalPct !== 100){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Budget split must total 100%</div><div class="ibb">Current total: ${totalPct}%.</div></div>`; return; }
-
-  const setup = {
-    budget, loc, dateStart, dateEnd, objective, audience,
-    budgetPlan:{ kolPct, paidPct, prodPct, contPct,
-      kolAmount:Math.round(budget*kolPct/100), paidAmount:Math.round(budget*paidPct/100),
-      prodAmount:Math.round(budget*prodPct/100), contAmount:Math.round(budget*contPct/100) },
-  };
+  let advertiserId = advSel ? Number(advSel.value) || null : AUTH.advertiser?.id;
   try{
+    if(advSel && advSel.value === '__new__'){
+      const company = document.getElementById('np-new-adv-company').value.trim();
+      const brand = document.getElementById('np-new-adv-brand').value.trim();
+      if(!company || !brand){ msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">New advertiser needs a company and brand name</div></div>`; return; }
+      const advData = await api('/advertisers', { method:'POST', body:{ company, brand } });
+      advertiserId = advData.advertiser.id;
+      await refreshAdvertisers();
+      AUTH.activeAdvertiserId = advertiserId;
+    }
+
+    const setup = {
+      budget, loc, dateStart, dateEnd, objective, audience,
+      budgetPlan:{ kolPct, paidPct, prodPct, contPct,
+        kolAmount:Math.round(budget*kolPct/100), paidAmount:Math.round(budget*paidPct/100),
+        prodAmount:Math.round(budget*prodPct/100), contAmount:Math.round(budget*contPct/100) },
+    };
     const data = await api('/campaigns/save', { method:'POST', body:{ advertiserId, name, status:'active', snapshot:{ setup } } });
     closeModal();
     await refreshProjects();
@@ -620,6 +658,36 @@ async function createProject(){
   }catch(e){
     msg.innerHTML = `<div class="ib ibr"><div class="ibl" style="color:var(--rs)">Could not create project</div><div class="ibb">${escHtml(e.message)}</div></div>`;
   }
+}
+
+// Computes the same "what's missing" list the create-project modal used to
+// block on — now purely informational, shown as a standing banner on
+// Overview and as small flags elsewhere, never as a gate on saving or
+// navigating.
+function computeProjectGaps(project, channels, mix){
+  const setup = project?.snapshot?.setup || {};
+  const gaps = [];
+  if(!setup.objective) gaps.push('Objective not set');
+  if(!setup.audience) gaps.push('Target audience not set');
+  if(!setup.budget) gaps.push('Total budget not set');
+  if(!setup.dateStart || !setup.dateEnd) gaps.push('Campaign dates not set');
+  const bp = setup.budgetPlan;
+  if(bp){
+    const totalPct = (bp.kolPct||0)+(bp.paidPct||0)+(bp.prodPct||0)+(bp.contPct||0);
+    if(totalPct && totalPct !== 100) gaps.push(`Budget split totals ${totalPct}% (should be 100%)`);
+  }
+  if(!channels.length) gaps.push('No media channels added yet');
+  const noBudget = channels.filter(c=>!c.budgetPlanned).length;
+  if(noBudget) gaps.push(`${noBudget} channel(s) missing a planned budget`);
+  const noDates = channels.filter(c=>!c.startDate || !c.endDate).length;
+  if(noDates) gaps.push(`${noDates} channel(s) missing flight dates`);
+  const noTracking = channels.filter(c=>c.status==='live' && (c.pixelStatus!=='verified'||c.ga4Status!=='verified'||c.gtmStatus!=='verified')).length;
+  if(noTracking) gaps.push(`${noTracking} live channel(s) with tracking not fully verified`);
+  return gaps;
+}
+function gapsBannerHtml(gaps){
+  if(!gaps.length) return `<div class="ib ibs mb2"><div class="ibl" style="color:var(--sg)">Nothing missing</div><div class="ibb">This project's info is complete.</div></div>`;
+  return `<div class="ib ibg mb2"><div class="ibl" style="color:#8A7000">Missing info — nothing is locked, this is just a reminder</div><div class="ibb">${gaps.map(escHtml).join(' · ')}</div></div>`;
 }
 
 // Persists a partial change to setup while preserving every other snapshot
@@ -666,6 +734,7 @@ function renderOverview(){
   document.getElementById('pg-overview').innerHTML = `
     <div class="stitle">${escHtml(p.name)}</div>
     <div class="ssub">${escHtml(p.advertiserBrand||'')} · ${setup.dateStart||'?'} → ${setup.dateEnd||'?'} · ${escHtml(setup.loc||'—')}</div>
+    ${gapsBannerHtml(computeProjectGaps(p, S.channels, mix))}
     <div class="g4 mb2">
       <div class="kpi"><div class="klbl">Total Budget</div><div class="kval">${fmt(setup.budget)}</div></div>
       <div class="kpi"><div class="klbl">Planned (mix)</div><div class="kval">${fmt(mix.totals.planned)}</div></div>
@@ -733,16 +802,27 @@ async function saveOverviewBasics(){
 // ═══════════════════════════════════════════════════════════════════════
 // MEDIA PLAN — channel breakdown table
 // ═══════════════════════════════════════════════════════════════════════
+// Small non-blocking flag for a row/card missing budget or dates — never
+// hides the row or disables editing, just draws the eye to what's incomplete.
+function missingInfoFlag(c){
+  const gaps = [];
+  if(!c.budgetPlanned) gaps.push('no budget');
+  if(!c.startDate || !c.endDate) gaps.push('no dates');
+  if(!gaps.length) return '';
+  return `<span class="status-pill" style="margin-left:6px" title="${escHtml(gaps.join(', '))}"><span class="status-dot" style="background:${TONE_HEX.warn}"></span>${escHtml(gaps.join(', '))}</span>`;
+}
+
 function renderMediaPlan(){
+  const canDelete = AUTH.role === 'superadmin';
   const rows = S.channels.map(c => `
     <tr class="clickable" onclick="openChannelModal(${c.id})">
-      <td><span class="ch-chip"><span class="ch-swatch" style="background:${channelInfo(c.channel).color}"></span>${escHtml(channelInfo(c.channel).label)}</span></td>
+      <td><span class="ch-chip"><span class="ch-swatch" style="background:${channelInfo(c.channel).color}"></span>${escHtml(channelInfo(c.channel).label)}</span>${missingInfoFlag(c)}</td>
       <td>${statusPill(CHANNEL_STATUS, c.status)}</td>
       <td>${c.startDate||'—'} → ${c.endDate||'—'}</td>
       <td>${escHtml(c.objective)||'—'}</td>
       <td>${fmt(c.budgetPlanned)}</td>
       <td>${fmt(c.budgetActual)}</td>
-      <td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="deleteChannel(${c.id})">Remove</button></td>
+      <td onclick="event.stopPropagation()">${canDelete ? `<button class="btn btn-outline btn-sm" onclick="deleteChannel(${c.id})">Remove</button>` : `<span style="font-size:9.5px;color:var(--ms)" title="Only super admin can remove a channel — edit or pause it instead">🔒 admin only</span>`}</td>
     </tr>`).join('');
   document.getElementById('pg-mediaplan').innerHTML = `
     <div class="stitle">Media Plan</div>
@@ -785,10 +865,14 @@ async function addSelectedChannels(){
   }
 }
 async function deleteChannel(id){
-  if(!confirm('Remove this channel from the media plan? Its budget and tracking data will be deleted.')) return;
-  await api(`/media-plan-channels/${id}`, { method:'DELETE' });
-  await refreshActiveProjectData();
-  setPage(S.page);
+  if(!confirm('Remove this channel from the media plan? Its budget and tracking data will be deleted. This requires super admin.')) return;
+  try{
+    await api(`/media-plan-channels/${id}`, { method:'DELETE' });
+    await refreshActiveProjectData();
+    setPage(S.page);
+  }catch(e){
+    alert('Could not remove channel: '+e.message);
+  }
 }
 
 // ═══ Unified channel edit modal (used by Media Plan, Channels, Tracking) ═══
@@ -907,7 +991,7 @@ function renderChannelsPage(){
     const info = channelInfo(c.channel);
     const kt = c.kpiTargets, ka = c.kpiActuals;
     return `<div class="card" style="cursor:pointer" onclick="openChannelModal(${c.id})">
-      <div class="card-hd"><span class="ch-chip"><span class="ch-swatch" style="background:${info.color}"></span>${escHtml(info.label)}</span>${statusPill(CHANNEL_STATUS,c.status)}</div>
+      <div class="card-hd"><span class="ch-chip"><span class="ch-swatch" style="background:${info.color}"></span>${escHtml(info.label)}</span><span>${missingInfoFlag(c)}${statusPill(CHANNEL_STATUS,c.status)}</span></div>
       <div style="font-size:11px;color:var(--sl);margin-bottom:8px">${c.startDate||'?'} → ${c.endDate||'?'} · ${escHtml(c.targetAudience)||'No audience note'}</div>
       <div style="font-size:11.5px;color:var(--sl);margin-bottom:8px">${escHtml(c.objective)||'<span style="color:var(--ms)">No objective set</span>'}</div>
       <div class="mix-track mb"><div class="mix-fill" style="width:${pct(c.budgetActual,Math.max(c.budgetPlanned,c.budgetActual,1))}%;background:${info.color}"></div></div>

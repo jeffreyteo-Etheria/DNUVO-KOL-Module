@@ -681,13 +681,21 @@ app.post('/media-plan-channels', async (req, res) => {
   }
 });
 
+// Deletion is super-admin-only, same as /campaigns/:id — a channel's budget
+// and tracking history stays in the plan (editable by anyone with access)
+// until an admin approves actually removing it.
 app.delete('/media-plan-channels/:id', async (req, res) => {
   try {
+    const access = await requireAccess(req, res);
+    if (!access) return;
     const id = Number(req.params.id);
     const existing = await getMediaPlanChannel(id);
     if (!existing) return res.status(404).json({ error: 'Media plan channel not found' });
     const ctx = await requireCampaignAccess(req, res, existing.campaignId);
     if (!ctx) return;
+    if (access.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only super admin can delete a channel. Edit or pause it instead — it stays in the plan until an admin removes it.' });
+    }
     const deleted = await deleteMediaPlanChannel(id);
     res.json({ deleted });
   } catch (e) {
